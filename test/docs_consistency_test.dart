@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:invitation_studio/domain/invitation_template.dart';
 
 /// The validated SDK, quoted in the README, the QA record, the video report and
 /// the CI workflow. Keep these in one place so the docs cannot drift apart.
@@ -106,6 +107,72 @@ void main() {
         isFalse,
         reason: 'README should not pin a fixed test count; see docs/QA.md',
       );
+    });
+
+    test('no document pins a test-case count', () {
+      // A hand-typed total drifts every time a design or a format is added.
+      // "16 test files" is allowed: the test below checks it against disk.
+      final pinned = RegExp(r'(?<![=\w.])\d+\s+tests?(?!\s+files)');
+      for (final path in [
+        'README.md',
+        'docs/QA.md',
+        'docs/VIDEO.md',
+        'docs/ARCHITECTURE.md',
+      ]) {
+        final match = pinned.firstMatch(_read(path));
+        expect(
+          match,
+          isNull,
+          reason:
+              '$path pins "${match?.group(0)}"; state the executed count '
+              'instead of hard-coding it, or drop the number',
+        );
+      }
+    });
+
+    test('the docs agree with the design catalogue', () {
+      // The catalogue is the number the copy, the picker and the docs all talk
+      // about, so it is asserted here rather than trusted.
+      expect(catalogueTemplates, hasLength(60));
+      expect(legacyTemplates, hasLength(9));
+      expect(invitationTemplates, hasLength(69));
+      for (final category in InvitationCategory.values) {
+        final designs = templatesFor(category);
+        expect(designs, hasLength(10), reason: category.wireName);
+        expect(
+          designs.every((design) => design.categories.contains(category)),
+          isTrue,
+          reason: '${category.wireName} offers a design drawn for another one',
+        );
+        expect(
+          designs.any(legacyTemplates.contains),
+          isFalse,
+          reason: 'legacy layouts must stay out of the picker',
+        );
+      }
+      final architecture = _read('docs/ARCHITECTURE.md');
+      expect(architecture, contains('${catalogueTemplates.length} designs'));
+      expect(architecture, contains('${legacyTemplates.length} legacy'));
+    });
+
+    test('no UI copy still promises three designs', () {
+      // The panel used to say "Three original designs" while looping over 69.
+      const stale = [
+        'Three original designs',
+        'Three original',
+        'A world of possibilities',
+      ];
+      for (final entity in Directory('lib').listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        final source = entity.readAsStringSync();
+        for (final phrase in stale) {
+          expect(
+            source,
+            isNot(contains(phrase)),
+            reason: '${entity.path} still says "$phrase"',
+          );
+        }
+      }
     });
 
     test('the verification records agree on the suite size, and it is real', () {

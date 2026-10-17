@@ -92,7 +92,54 @@ def render(category):
     return (buffer * 32767).astype('<i2')
 
 
+DURATIONS_DART = (
+    Path(__file__).resolve().parents[1]
+    / 'lib'
+    / 'domain'
+    / 'category_music_durations.g.dart'
+)
+
+
+def wav_duration_ms(path):
+    """Length of the rendered file, measured from its own header.
+
+    The declared duration must come from the file rather than from the
+    synthesiser's intent: trim bounds, fades and validation all use it, and a
+    number that disagrees with the asset is silently wrong in the UI.
+    """
+    with wave.open(str(path), 'rb') as handle:
+        frames = handle.getnframes()
+        rate = handle.getframerate()
+    return frames * 1000 // rate
+
+
+def write_durations(durations):
+    """Emits the per-category duration map the Dart code reads.
+
+    Regenerating the tunes rewrites this file, so the two can never drift.
+    """
+    rows = '\n'.join(
+        f"  '{category}': {ms}," for category, ms in durations.items()
+    )
+    DURATIONS_DART.write_text(
+        '// GENERATED FILE — do not edit by hand.\n'
+        '//\n'
+        '// Written by `python tool/generate_music.py` from the headers of the\n'
+        '// bundled WAVs in assets/music/. Regenerate the tunes to update it;\n'
+        '// test/category_music_test.dart fails if this map and the assets\n'
+        '// disagree.\n'
+        '\n'
+        '/// Bundled tune length per category (wire name), in milliseconds.\n'
+        'const Map<String, int> categoryTuneDurationsMs = <String, int>{\n'
+        f'{rows}\n'
+        '};\n',
+        encoding='utf-8',
+    )
+    print(f'wrote {DURATIONS_DART.relative_to(DURATIONS_DART.parents[3])}')
+
+
 def main():
+    durations = {}
     for category in TRACKS:
         samples = render(category)
         path = OUT / f'tune_{category}.wav'
@@ -101,7 +148,14 @@ def main():
             handle.setsampwidth(2)
             handle.setframerate(SR)
             handle.writeframes(samples.tobytes())
-        print(path.name, path.stat().st_size // 1024, 'KB')
+        durations[category] = wav_duration_ms(path)
+        print(
+            path.name,
+            path.stat().st_size // 1024,
+            'KB',
+            f'{durations[category] / 1000:.2f} s',
+        )
+    write_durations(durations)
 
 
 if __name__ == '__main__':

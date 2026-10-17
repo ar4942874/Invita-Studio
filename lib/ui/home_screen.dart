@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../application/studio_controller.dart';
 import '../domain/invitation_template.dart';
 import '../domain/project.dart';
+import '../domain/relative_time.dart';
 import '../l10n/app_localizations.dart';
+import 'project_actions.dart';
 import 'studio_screen.dart';
 import 'studio_theme.dart';
 import 'widgets/controls.dart';
@@ -268,29 +271,28 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          if (drafts.length > 1) ...[
-            const SizedBox(height: 12),
-            TinyLabel(_l10n.recentInvitations),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final draft in drafts.take(4))
-                  ActionChip(
-                    label: Text(
-                      draft.title,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    onPressed: () => _openDraft(draft),
-                  ),
-              ],
+          const SizedBox(height: 12),
+          TinyLabel(_l10n.recentInvitations),
+          const SizedBox(height: 4),
+          for (final draft in drafts.take(4))
+            _DraftRow(
+              draft: draft,
+              active: draft.id == _studio.project.id,
+              onOpen: () => _openDraft(draft),
+              onDuplicate: () => duplicateDraft(context, _studio, draft),
+              onSaveCopy: () => saveProjectCopy(context, draft),
+              onDelete: draft.id == _studio.project.id
+                  ? null
+                  : () => _deleteDraft(draft),
             ),
-          ],
         ],
       ),
     );
+  }
+
+  Future<void> _deleteDraft(StudioProject draft) async {
+    await _studio.deleteDraft(draft.id);
+    if (mounted) _toast('Draft deleted.');
   }
 
   Widget _detailsStep() => Column(
@@ -485,60 +487,177 @@ class _CardTile extends StatelessWidget {
       format: InvitationFormat.classic,
       fields: fields,
     );
-    return Material(
-      color: selected
-          ? StudioColors.accentSoft.withValues(alpha: .55)
-          : StudioColors.wash,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
+    // One label per card. Without `excludeSemantics` the whole invitation is
+    // announced for every tile — ten full cards read out in a row.
+    return Semantics(
+      label: '${template.name}, ${template.caption}',
+      button: true,
+      selected: selected,
+      excludeSemantics: true,
+      child: Material(
+        color: selected
+            ? StudioColors.accentSoft.withValues(alpha: .55)
+            : StudioColors.wash,
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? StudioColors.accent : StudioColors.border,
-              width: selected ? 1.4 : 1,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: AspectRatio(
-                  aspectRatio: 1080 / 1512,
-                  child: DocumentPreview(document: document),
-                ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(13),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: selected ? StudioColors.accent : StudioColors.border,
+                width: selected ? 1.4 : 1,
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      template.name,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: AspectRatio(
+                    aspectRatio: 1080 / 1512,
+                    child: DocumentPreview(document: document),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        template.name,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                  if (selected)
-                    const Icon(
-                      Icons.check_circle,
-                      size: 17,
-                      color: StudioColors.accent,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                template.caption,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: StudioColors.muted,
+                    if (selected)
+                      const Icon(
+                        Icons.check_circle,
+                        size: 17,
+                        color: StudioColors.accent,
+                      ),
+                  ],
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  template.caption,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: StudioColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One draft in the recent list: its title, "Wedding · edited 2 h ago", and the
+/// two workflows people actually use when making variations.
+class _DraftRow extends StatelessWidget {
+  const _DraftRow({
+    required this.draft,
+    required this.active,
+    required this.onOpen,
+    required this.onDuplicate,
+    required this.onSaveCopy,
+    this.onDelete,
+  });
+
+  final StudioProject draft;
+  final bool active;
+  final VoidCallback onOpen;
+  final VoidCallback onDuplicate;
+  final VoidCallback onSaveCopy;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context).languageCode;
+    final relative = relativeTimeLabel(draft.updatedAt);
+    final stamp =
+        relative ??
+        DateFormat.yMMMd(locale).format(draft.updatedAt.toLocal());
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      draft.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${draft.category.label} · edited $stamp',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        color: StudioColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (active)
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: TinyLabel('Editing'),
+                ),
+              PopupMenuButton<String>(
+                tooltip: 'Draft options',
+                icon: const Icon(Icons.more_vert, size: 17),
+                padding: EdgeInsets.zero,
+                onSelected: (value) {
+                  switch (value) {
+                    case 'open':
+                      onOpen();
+                    case 'duplicate':
+                      onDuplicate();
+                    case 'copy':
+                      onSaveCopy();
+                    case 'delete':
+                      onDelete?.call();
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'open', child: Text('Open')),
+                  const PopupMenuItem(
+                    value: 'duplicate',
+                    child: Text('Duplicate draft'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'copy',
+                    child: Text('Save a copy'),
+                  ),
+                  if (onDelete != null) ...[
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete draft'),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),

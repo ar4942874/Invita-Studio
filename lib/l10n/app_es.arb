@@ -9,7 +9,7 @@
   "homeCelebrateSubtitle": "Elige una categoría para adaptar el texto. Podrás cambiarlo todo después.",
   "homeDetailsSubtitle": "Estos datos rellenan tu invitación. El texto largo se reduce para encajar; no se recorta nada.",
   "homeCardSubtitle": "Cada diseño conserva tus palabras. Puedes cambiar o rediseñar cuando quieras.",
-  "homeCardSubtitleForCategory": "Diseños para {category}, además de nuestros clásicos. Cada diseño conserva tus palabras.",
+  "homeCardSubtitleForCategory": "Diseños para {category}. Cada diseño conserva tus palabras.",
   "continueDraft": "Continuar «{title}»",
   "continueEditing": "Seguir editando",
   "recentInvitations": "Invitaciones recientes",

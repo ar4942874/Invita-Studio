@@ -1,3 +1,4 @@
+import 'category_music_durations.g.dart';
 import 'invitation_template.dart';
 import 'video/timeline.dart';
 
@@ -14,10 +15,11 @@ abstract final class CategoryMusic {
   static const String assetPrefix = 'tune_';
   static const String folder = 'assets/music';
 
-  /// Bundled length of every tune, in milliseconds.
-  static const int durationMs = 12000;
-
   /// Gentle defaults so the music sits under the invitation rather than over it.
+  ///
+  /// The fades are fixed rather than proportional: the shortest tune is over
+  /// five seconds, so even the longest fade pair leaves more than two seconds
+  /// of audible track.
   static const int volume = 55;
   static const int fadeInMs = 1200;
   static const int fadeOutMs = 1800;
@@ -31,6 +33,28 @@ abstract final class CategoryMusic {
   /// True when [assetId] names a bundled category tune.
   static bool isTune(String? assetId) =>
       assetId != null && assetId.startsWith(assetPrefix);
+
+  /// Real length of [category]'s tune, measured from the bundled WAV.
+  ///
+  /// Trim bounds, fade limits and the export preflight all read this. It is
+  /// generated (see `tool/generate_music.py`) rather than guessed, because a
+  /// wrong length silently misplaces every trim handle in the UI.
+  static int durationFor(InvitationCategory category) =>
+      categoryTuneDurationsMs[category.wireName] ?? fallbackDurationMs;
+
+  /// Real length of the tune behind [assetId], or [fallbackDurationMs] when the
+  /// ID is not a bundled tune.
+  static int durationForAsset(String assetId) {
+    final key = assetId.startsWith(assetPrefix)
+        ? assetId.substring(assetPrefix.length)
+        : assetId;
+    return categoryTuneDurationsMs[key] ?? fallbackDurationMs;
+  }
+
+  /// Used only if a category is added before its tune is generated: the
+  /// shortest declared tune keeps trim bounds inside a real file.
+  static int get fallbackDurationMs =>
+      categoryTuneDurationsMs.values.reduce((a, b) => a < b ? a : b);
 
   static const _titles = <InvitationCategory, String>{
     InvitationCategory.wedding: 'Wedding theme',
@@ -48,7 +72,7 @@ abstract final class CategoryMusic {
   static VideoAudio forCategory(InvitationCategory category) => VideoAudio(
     assetId: tuneId(category),
     title: title(category),
-    durationMs: durationMs,
+    durationMs: durationFor(category),
     volume: volume,
     fadeInMs: fadeInMs,
     fadeOutMs: fadeOutMs,

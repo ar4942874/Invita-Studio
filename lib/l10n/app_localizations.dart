@@ -155,7 +155,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeCardSubtitleForCategory.
   ///
   /// In en, this message translates to:
-  /// **'Designs for a {category}, plus our timeless favourites. Every design keeps your words.'**
+  /// **'Designs for a {category}. Every design keeps your words.'**
   String homeCardSubtitleForCategory(String category);
 
   /// No description provided for @continueDraft.

@@ -61,6 +61,21 @@ encoder:
   runtime. `tool/reference_sample.py` is a development-only verification script
   (Pillow + imageio-ffmpeg); it is not compiled into or called by the app.
 
+## Invitation actions
+
+Two packages were added for the calendar and RSVP actions, both BSD-3-Clause:
+
+- **qr 3.0.2** — pure-Dart QR encoder (no network, no image service). Encodes the
+  RSVP link on the device; `lib/ui/widgets/qr_code.dart` paints the modules.
+  License: `qr` package `LICENSE` (Copyright 2014, the Dart QR project authors),
+  reproduced in `docs/DEPENDENCY_NOTICES.txt`.
+- **url_launcher 6.3.2** — opens the generated Google Calendar link in the
+  platform browser; if no handler answers, the link is copied to the clipboard
+  instead. License: BSD-3-Clause, The Flutter Authors.
+
+Neither package uploads invitation data: the `.ics` file, the calendar link and
+the code are all produced locally.
+
 ## Bundled fonts — SIL Open Font License 1.1
 
 These are unmodified font files, locally bundled, not a claim that a fonts wrapper licenses font artwork.
@@ -82,6 +97,8 @@ Font licenses are also registered in Flutter’s in-app About → Licenses scree
 | `flutter_bloc` / `equatable` | 9.1.1 / 3.0.0 | MIT |
 | `image` (native/VM JPEG path) | 4.12.0 | MIT |
 | `share_plus` | 13.3.1 | BSD-3-Clause |
+| `qr` (RSVP code encoder) | 3.0.2 | BSD-3-Clause, the Dart QR project authors |
+| `url_launcher` (calendar links) | 6.3.2 | BSD-3-Clause, The Flutter Authors |
 | `shared_preferences` | 2.5.6 | BSD-3-Clause |
 | `file_selector` | 1.1.0 | BSD-3-Clause |
 | `cross_file` | 0.3.5+5 | BSD-3-Clause |

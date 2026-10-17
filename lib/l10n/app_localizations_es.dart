@@ -41,7 +41,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String homeCardSubtitleForCategory(String category) {
-    return 'Diseños para $category, además de nuestros clásicos. Cada diseño conserva tus palabras.';
+    return 'Diseños para $category. Cada diseño conserva tus palabras.';
   }
 
   @override

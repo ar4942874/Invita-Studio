@@ -200,7 +200,21 @@ swapped behind conditional imports:
   managed storage: the web hands back a blob object URL for the preview player,
   and native copies the bytes into the project's audio folder so the encoder can
   mux them. Creating a project pre-selects the matching tune, so music is present
-  without an import step.
+  without an import step. Each tune's length comes from a generated map
+  (`category_music_durations.g.dart`, written by `tool/generate_music.py` from the
+  WAV headers), because trim handles, fade limits and the preflight all need the
+  real length rather than a fixed guess.
+
+**Which audio an export actually needs.** `lib/services/video/export_media.dart`
+owns the single rule: the music file is required only on a native build with an
+unmuted track. A browser export is silent by construction, and a muted track is
+written without an audio track, so neither may fail for a missing file. The same
+module routes `tune_*` IDs through `loadBundledTune` — resolving a bundled tune
+with `loadAudio` is what used to abort every first-run browser export.
+`lib/services/video/export_preflight.dart` turns the same inputs into the
+checklist the export dialog shows before rendering (background present, music
+present or deliberately muted, browser silence, dimensions, frame count,
+estimated size and time), with one-tap fixes.
 
 `ImportedClip.readFrame` abstracts the frame source: native reads JPEG files
 from the managed directory, the browser returns in-memory PNG bytes.
@@ -218,7 +232,7 @@ from the managed directory, the browser returns in-memory PNG bytes.
 | Project JSON round-trip / v1 migration / validation tests | `test/video_project_test.dart` — pass on Flutter 3.47.7 / Dart 3.13.5 |
 | Timeline evaluation, easing, frame-index tests | `test/video_timeline_test.dart` — pass |
 | Media/manifest/frame-mapping/progress tests | `test/video_media_test.dart` — pass |
-| Full suite (13 test files), web export/import/music wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
+| Full suite (19 test files), web export/import/music wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
 
 ### Not executed (needs a real device or macOS/Windows toolchain)
 
@@ -238,7 +252,7 @@ builds or that the native plugins ran.
 
 ### Required device checks before claiming completion
 
-1. Re-run `flutter pub get && flutter analyze && flutter test --concurrency=1 test packages/flutter_canvas_editor/test` on Flutter 3.47.7 / Dart 3.13.5 against the release commit (currently analyzer-clean and 300 passing).
+1. Re-run `flutter pub get && flutter analyze && flutter test --concurrency=1 test packages/flutter_canvas_editor/test` on Flutter 3.47.7 / Dart 3.13.5 against the release commit (currently analyzer-clean with the full suite green; read the executed case count from the run itself, it is not pinned here).
 2. Android device/emulator (API 24+): import a 10 s clip, export 15 s Story with music; verify with `ffprobe`/MediaInfo that it is H.264 + AAC, 450 frames, 1080 × 1920, 30 fps; confirm cancellation leaves no partial file.
 3. Repeat for Square and Classic, and for the 540 × 960 quality option.
 4. iOS 15+ device: same exports; confirm the second-pass mux keeps audio in sync and that the iPad share popover anchors to the Share button.

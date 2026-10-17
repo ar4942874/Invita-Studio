@@ -462,11 +462,14 @@ abstract class VideoMediaService {
   ///
   /// The browser returns an object URL for preview playback; native copies the
   /// bytes into the project's managed audio folder so the exporter can mux it.
+  ///
+  /// The returned duration comes from the generated catalogue, not from the
+  /// caller or the draft: the bundled file cannot change, so its measured
+  /// length always wins.
   Future<ImportedAudio?> loadBundledTune({
     required String projectId,
     required String assetId,
     String? title,
-    int durationMs = 0,
   });
 
   Future<void> deleteAudio(ImportedAudio audio);

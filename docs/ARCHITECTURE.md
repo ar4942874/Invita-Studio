@@ -68,9 +68,9 @@ The package names the commercial typefaces *Canela* (display) and *Inter* (body)
 
 ## Category catalogue, music and reflow
 
-The card step offers ten designs per celebration. A design is a *motif* drawn in a *category palette*: ten hand-written motifs (botanical, celestial, petals, foil frame, arches, confetti, clouds, constellation, laurel, sunburst) are rendered once per celebration palette by `tool/generate_category_art.py`, producing sixty 2× backgrounds and their thumbnails. Because a design carries no template-specific layout, all sixty share the same linked text slots; the nine original designs remain in the catalogue only so older drafts still resolve and export, and `templateFor` matches the exact background asset rather than a name prefix.
+The card step offers ten designs per celebration. A design is a *motif* drawn in a *category palette*: ten hand-written motifs (botanical, celestial, petals, foil frame, arches, confetti, clouds, constellation, laurel, sunburst) are rendered once per celebration palette by `tool/generate_category_art.py`, producing sixty 2× backgrounds and their thumbnails. Because a design carries no template-specific layout, all sixty share the same linked text slots; the nine original designs remain in the catalogue only so older drafts still resolve and export, and `templateFor` matches the exact background asset rather than a name prefix. `invitationTemplates` is therefore the full render list (60 designs, plus 9 legacy layouts) that the asset allowlist and image provider derive from, while `catalogueTemplates` is what the studio picker may show: the in-editor panel lists `templatesFor(category)` first and offers "All designs" over the sixty, and legacy layouts are reachable only through the asset resolver. The home wizard and the panel therefore never disagree about what the catalogue contains. The in-editor picker is a grid with tabs (For you / All designs / Favourites / Recent), a preview of the applied design and "Surprise me"; favourites and recently-used IDs live in `CatalogPrefs` (shared preferences), not in the project, because they describe the person rather than one invitation. `StudioController.chooseTemplate` records recency for every entry point, including the wizard.
 
-Each celebration also ships a short synthesized tune (`tool/generate_music.py`, 16 kHz mono WAV) at `assets/music/tune_<category>.wav`. `CategoryMusic` turns the category into a normal `VideoAudio` whose asset ID carries the `tune_` prefix; the media services resolve that prefix from the app bundle instead of managed storage (`loadBundledTune`), so the tune needs no import step. Creating a project pre-selects it. On the web it plays through the preview player while the browser export stays silent; on native the bytes are copied into the project's audio folder and muxed into the MP4.
+Each celebration also ships a short synthesized tune (`tool/generate_music.py`, 16 kHz mono WAV) at `assets/music/tune_<category>.wav`. `CategoryMusic` turns the category into a normal `VideoAudio` whose asset ID carries the `tune_` prefix; the media services resolve that prefix from the app bundle instead of managed storage (`loadBundledTune`), so the tune needs no import step. Declared lengths are generated from the WAV headers into `lib/domain/category_music_durations.g.dart` rather than hard-coded, so trim bounds and the export preflight use the real track length. Creating a project pre-selects it. On the web it plays through the preview player while the browser export stays silent; on native the bytes are copied into the project's audio folder and muxed into the MP4.
 
 Text stays legible when a field is enlarged: `StudioController._reflowStack` re-stacks the linked wording into a single vertical column, keeping each field's horizontal placement while pushing siblings down, then shifting the column up and compressing gaps until it fits inside the page margins. The font-size slider drives it, so increasing one field never overlaps the next.
 
@@ -87,9 +87,21 @@ Text stays legible when a field is enlarged: `StudioController._reflowStack` re-
 
 The result is independent of physical screen dimensions and viewport zoom. This is not a print-prepress or cross-platform pixel-identical typography guarantee.
 
+## Invitation actions
+
+The `date` and `time` fields are the card's prose and stay free text. Next to them, optional pickers write a localized, formatted string into those same fields *and* store the event as `EventDateTime` (calendar date plus optional hour/minute). Nothing is inferred from the prose, so a host who types "Reception at 7:00 in the evening" keeps exactly that.
+
+Everything downstream is pure string work in `lib/services/invite_actions.dart`:
+
+* `buildIcs` writes an RFC 5545 `VEVENT` with CRLF endings, escaped text and octet-aware folding at 75 bytes — an Urdu summary folds on bytes, not characters, so strict parsers accept it. Times are floating (no `TZID`): the picker captured a wall-clock time, not an instant in a zone.
+* `googleCalendarUrl` builds a `TEMPLATE` link with the same details, opened through `url_launcher` and copied to the clipboard when no handler answers.
+* `isValidRsvpUrl` gates the RSVP field to absolute `http(s)` URLs; the code itself is drawn on-device with `package:qr` (`QrCodeView`), so no link ever leaves the app to be rendered.
+
+The structured event travels in the project JSON, so a reopened draft still has its calendar and RSVP actions.
+
 ## Persistence and import security
 
-`invita.project` version 1 stores project ID, title, UTC modification time and document JSON. Schema 2 adds the video timeline and, additively, a celebration `category` (older files without the key load as `wedding`). Each project is independent of its flattened exports. Local preferences store at most 12 projects; opening a new one at capacity is blocked instead of silently dropping an old one.
+`invita.project` version 1 stores project ID, title, UTC modification time and document JSON. Schema 2 adds the video timeline and, additively, a celebration `category` (older files without the key load as `wedding`), a structured `when` (`{date, hour, minute}`, floating local time) and an optional `rsvpUrl`. All three are optional: a draft typed as prose still opens, and the calendar/RSVP actions stay hidden until a date exists. Each project is independent of its flattened exports. Local preferences store at most 12 projects; opening a new one at capacity is blocked instead of silently dropping an old one.
 
 Autosave is debounced by 650 ms and storage writes are serialized. Save-state revisions prevent an older write from falsely marking a newer pending edit saved. A write failure is visible and prompts a JSON backup. Lifecycle save attempts are best effort; a browser shutdown is not a transactional database commit.
 

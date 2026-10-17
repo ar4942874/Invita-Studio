@@ -259,14 +259,16 @@ class WebVideoMediaService implements VideoMediaService {
     required String projectId,
     required String assetId,
     String? title,
-    int durationMs = 0,
   }) async {
+    // The catalogue is authoritative for a bundled tune: the file never
+    // changes, and a stale duration recorded in an older draft must not win.
+    final declared = CategoryMusic.durationForAsset(assetId);
     var stored = _bundled[assetId];
     if (stored == null) {
       final data = await rootBundle.load('${CategoryMusic.folder}/$assetId.wav');
       stored = _WebAudio(
         title: title ?? assetId,
-        durationMs: durationMs,
+        durationMs: declared,
         mimeType: 'audio/wav',
         bytes: data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
       );
@@ -275,7 +277,7 @@ class WebVideoMediaService implements VideoMediaService {
     return ImportedAudio(
       assetId: assetId,
       title: title ?? stored.title,
-      durationMs: durationMs > 0 ? durationMs : stored.durationMs,
+      durationMs: declared,
       url: stored.ensureUrl(),
     );
   }

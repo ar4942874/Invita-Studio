@@ -9,7 +9,7 @@
   "homeCelebrateSubtitle": "Pick a category to shape the wording. You can change everything later.",
   "homeDetailsSubtitle": "These fill your invitation. Long text scales down to fit — nothing is cut off.",
   "homeCardSubtitle": "Every design keeps your words. You can switch or restyle at any time.",
-  "homeCardSubtitleForCategory": "Designs for a {category}, plus our timeless favourites. Every design keeps your words.",
+  "homeCardSubtitleForCategory": "Designs for a {category}. Every design keeps your words.",
   "@homeCardSubtitleForCategory": {
     "placeholders": {
       "category": {

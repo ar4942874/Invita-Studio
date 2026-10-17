@@ -349,8 +349,8 @@ class InvitationTemplate {
 
 /// The original artwork set. Kept so older drafts (whose backgrounds reference
 /// these IDs) stay valid and exportable; it is no longer offered on the card
-/// step, which now shows the per-category collection below.
-const _legacyTemplates = [
+/// step, and it is not browsable in the studio either.
+const legacyTemplates = [
   InvitationTemplate(
     'botanical',
     'Botanical vows',
@@ -518,17 +518,28 @@ final _categoryDesigns = <InvitationTemplate>[
 /// sixty per-category designs. The importer allowlist and image provider are
 /// both derived from this list.
 final invitationTemplates = <InvitationTemplate>[
-  ..._legacyTemplates,
+  ...legacyTemplates,
   ..._categoryDesigns,
 ];
 
-/// Exactly ten designs for [category], ordered by motif. Falls back to the
-/// legacy set only if a category somehow has no art.
+/// The browsable catalogue: sixty designs, ten per celebration.
+///
+/// The legacy layouts are excluded on purpose. They carry no category, exist
+/// only so old drafts keep resolving and exporting, and must not come back into
+/// the picker — `invitationTemplates` (not this list) is what the asset
+/// resolver and allowlist use.
+final catalogueTemplates =
+    List<InvitationTemplate>.unmodifiable(_categoryDesigns);
+
+/// Exactly ten designs for [category], ordered by motif.
+///
+/// The fallback covers a future category whose art has not been generated yet:
+/// it shows the universal catalogue rather than resurrecting legacy layouts.
 List<InvitationTemplate> templatesFor(InvitationCategory category) {
-  final designs = invitationTemplates
+  final designs = catalogueTemplates
       .where((t) => t.categories.contains(category))
       .toList();
-  return designs.isEmpty ? _legacyTemplates.take(10).toList() : designs;
+  return designs.isEmpty ? catalogueTemplates.take(10).toList() : designs;
 }
 
 InvitationTemplate templateFor(DesignDocument doc) {
@@ -548,6 +559,29 @@ InvitationFormat formatFor(DesignDocument doc) =>
       (f) => f.height == doc.height,
       orElse: () => InvitationFormat.classic,
     );
+
+/// Looks a design up by ID, for favourites and recently-used lists that store
+/// only IDs. Returns `null` for a design that no longer exists.
+InvitationTemplate? templateById(String id) {
+  for (final template in invitationTemplates) {
+    if (template.id == id) return template;
+  }
+  return null;
+}
+
+/// Picks a design for "Surprise me".
+///
+/// Never returns [current] while another option exists, so the button always
+/// changes the card. [random] is injectable so the behaviour can be tested.
+InvitationTemplate surpriseDesign(
+  List<InvitationTemplate> pool, {
+  InvitationTemplate? current,
+  math.Random? random,
+}) {
+  final options = pool.where((t) => t.id != current?.id).toList();
+  final source = options.isEmpty ? pool : options;
+  return source[(random ?? math.Random()).nextInt(source.length)];
+}
 
 TextStyle nodeTextStyle(TextNode node, {double? size}) => TextStyle(
   fontFamily: node.fontFamily,

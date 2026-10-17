@@ -7,6 +7,7 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/video/timeline.dart';
+import 'export_media.dart';
 import 'frame_renderer.dart';
 import 'video_encoder.dart';
 import 'video_encoder_platform.dart';
@@ -169,7 +170,9 @@ class VideoExporter {
     if (problems.isNotEmpty) {
       throw VideoExportException(problems.first);
     }
-    if (timeline.audio != null && request.audio == null) {
+    if (timeline.audio != null &&
+        exportNeedsAudio(timeline.audio, isWeb: kIsWeb) &&
+        request.audio == null) {
       throw const VideoExportException(
         'The music file for this draft is missing. Re-import it or mute the track.',
       );
@@ -235,23 +238,26 @@ class VideoExporter {
       if (await tempFile.exists()) await tempFile.delete();
     }
 
-    // Browsers record a silent video; audio muxing stays native-only.
-    final audioSource =
-        kIsWeb || timeline.audio == null || timeline.audio!.isMuted
-        ? null
-        : request.audio;
-    final encoderAudio = audioSource == null
-        ? null
-        : EncoderAudioSpec(
-            path: audioSource.path,
-            startMs: timeline.audio!.startMs,
-            trimStartMs: timeline.audio!.trimStartMs,
-            trimEndMs: timeline.audio!.trimEndMs,
-            volume: timeline.audio!.volume,
-            fadeInMs: timeline.audio!.fadeInMs,
-            fadeOutMs: timeline.audio!.fadeOutMs,
-            durationMs: timeline.durationMs,
-          );
+    // Browsers record a silent video; audio muxing stays native-only, and a
+    // muted track is written without an audio track. Both cases are decided by
+    // the same rule the dialog uses to decide whether to resolve the file.
+    final audioTrack = timeline.audio;
+    final audioSource = exportNeedsAudio(audioTrack, isWeb: kIsWeb)
+        ? request.audio
+        : null;
+    EncoderAudioSpec? encoderAudio;
+    if (audioTrack != null && audioSource != null) {
+      encoderAudio = EncoderAudioSpec(
+        path: audioSource.path,
+        startMs: audioTrack.startMs,
+        trimStartMs: audioTrack.trimStartMs,
+        trimEndMs: audioTrack.trimEndMs,
+        volume: audioTrack.volume,
+        fadeInMs: audioTrack.fadeInMs,
+        fadeOutMs: audioTrack.fadeOutMs,
+        durationMs: timeline.durationMs,
+      );
+    }
 
     final renderer = TimelineFrameRenderer(
       document: document,

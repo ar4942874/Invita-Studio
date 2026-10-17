@@ -58,6 +58,15 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
 
   VideoTimeline get _timeline => widget.studio.project.video;
 
+  /// Length used for the trim handles.
+  ///
+  /// The resolved file wins over the value recorded in the draft: projects
+  /// created before the tunes were measured still store a 12 s guess.
+  int get _musicDurationMs {
+    final resolved = _audio?.durationMs ?? 0;
+    return resolved > 0 ? resolved : (_timeline.audio?.durationMs ?? 0);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -83,7 +92,6 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
             projectId: widget.studio.project.id,
             assetId: audioId,
             title: _timeline.audio?.title,
-            durationMs: _timeline.audio?.durationMs ?? 0,
           )
         : await _service.loadAudio(
             widget.studio.project.id,
@@ -577,19 +585,23 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
                   ),
                 ],
               ),
-              if (_timeline.audio!.durationMs > 0)
+              if (_musicDurationMs > 0)
                 _trimRow(
                   label: 'Trim',
-                  maxMs: _timeline.audio!.durationMs,
+                  maxMs: _musicDurationMs,
                   startMs: _timeline.audio!.trimStartMs,
                   endMs: _timeline.audio!.trimEndMs == 0
-                      ? _timeline.audio!.durationMs
-                      : _timeline.audio!.trimEndMs,
+                      ? _musicDurationMs
+                      : _timeline.audio!.trimEndMs
+                            .clamp(0, _musicDurationMs)
+                            .toInt(),
                   onChanged: (start, end) => _update(
                     timeline.copyWith(
                       audio: _timeline.audio!.copyWith(
                         trimStartMs: start,
                         trimEndMs: end,
+                        // Heals drafts saved while the tune length was a guess.
+                        durationMs: _musicDurationMs,
                       ),
                     ),
                   ),

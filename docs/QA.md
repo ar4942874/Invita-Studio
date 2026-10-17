@@ -10,11 +10,17 @@
 > Chromium 156 via Playwright 1.64.1. The video editor, MP4 exporter and both
 > native encoders were added afterwards. The full Flutter suite — including the
 > video model/exporter tests — now runs and passes on the project machine
-> (Flutter 3.47.7 / Dart 3.13.5, **300 tests**), `flutter analyze` is clean and
+> (Flutter 3.47.7 / Dart 3.13.5), `flutter analyze` is clean and
 > `flutter build web` succeeds; see
 > [the video verification report](VIDEO.md). What is still **not** executed is
 > everything that needs a real device: no APK/IPA, no native encode, no share
 > sheet. Treat native-only MP4 claims as source-only until then.
+>
+> **Suite size.** This record deliberately does not pin a number of test
+> *cases*: the generated design tests scale with the catalogue, so a hand-typed
+> total drifts silently. `test/docs_consistency_test.dart` checks the number of
+> test *files* and the catalogue counts instead. For the number of cases, read
+> the output of `flutter test`.
 
 ## Video increment (Dart suite runs; native pending)
 
@@ -25,8 +31,9 @@
 | Reference render with music | AAC-LC 44.1 kHz stereo; mean −23.2 dB, peak −13.6 dB |
 | Reference render without music | No audio stream |
 | Container | `isom`, `moov` before `mdat`, bt709 tags |
-| Timeline / project / media tests (`test/video_*_test.dart`, 3 files) | **Pass** on Flutter 3.47.7 / Dart 3.13.5 |
-| `flutter analyze`, `flutter test`, `flutter build web --release` | **Pass** — analyzer clean, 300 tests, web release builds |
+| Timeline / project / media tests (`test/video_*_test.dart`) | **Pass** on Flutter 3.47.7 / Dart 3.13.5 |
+| Tune-length and export-preflight tests (`test/category_music_test.dart`, `test/export_preflight_test.dart`, `test/video_export_dialog_test.dart`) | **Pass** — WAV headers match the generated map; the export dialog resolves a bundled tune and blocks on a missing clip |
+| `flutter analyze`, `flutter test`, `flutter build web --release` | **Pass** — analyzer clean, full suite green, web release builds |
 | Android encoder, iOS encoder, share sheet, device playback | **Not executed** — no JDK/Android SDK/Xcode/device |
 
 The sample MP4s are produced by `tool/reference_sample.py`, a development-only
@@ -41,7 +48,7 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 | Dependency resolution with `pubspec.lock` | Passed |
 | `flutter analyze` | **No issues found** |
 | `flutter test --concurrency=1 test packages/flutter_canvas_editor/test` | **64 passed** (image-editor baseline) |
-| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 13 test files pass** |
+| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 19 test files pass** |
 | `flutter build web --release --no-web-resources-cdn --no-wasm-dry-run -O1` | **Built successfully** |
 | Real compiled-app browser workflow checks | **12 passed** |
 | Real compiled-app photo-card browser checks | **7 passed** |
@@ -55,7 +62,8 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 - Every design across all three formats (9 legacy + 60 category designs = 207 combinations): complete IDs, dimensions and editable project roundtrip.
 - Each celebration offers exactly ten of its own designs; every bundled design ships art for each format plus a thumbnail and every category ships a bundled tune.
 - Growing a field re-stacks the linked wording into a single column with no vertical overlap that stays inside the page.
-- Creating a project from a category pre-selects that category's bundled tune.
+- Creating a project from a category pre-selects that category's bundled tune, and its declared length is measured from the bundled WAV header (not a fixed guess), so trim handles match the real track.
+- Export preflight: a bundled tune resolves through `loadBundledTune`, the music file is only required when it would actually be muxed (native, unmuted), and a missing clip or track is reported with a one-tap fix instead of throwing mid-render.
 - Photo layers: downscale/encode preparation, add/select/fit/delete, persistence and rejection of remote references, filesystem paths, sub-background ordering and unknown fit modes.
 - Text fitting without ellipsis or loss of wording; basic first-strong direction cases.
 - Rejection of filesystem/remote image references, unknown node/font types, duplicate IDs, oversized canvases/fonts/input and missing linked fields.
@@ -68,9 +76,14 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 - Immutable export snapshot while an image load is deliberately delayed and the live document changes.
 - Explicit export failure for missing artwork and rejection of unsafe scales/allocations.
 - Correct single-line center alignment in rendered pixels.
+- Event settings: changing the celebration swaps the bundled tune, keeps imported music, applies a matching design without losing the typed words, and never reflows the same template twice.
+- Duplicate draft: forks a new ID (document ID follows), keeps the copy title inside 80 characters, opens the copy, leaves the original intact and refuses a 13th draft.
+- Structured event: `EventDateTime` encode/decode/validation, `.ics` structure and CRLF/octet folding (including Urdu text), Google Calendar links, RSVP URL validation and relative "edited 2 h ago" labels.
+- Catalogue: the picker opens on the project category, "All designs" reaches sixty, starring moves a design into favourites, "Surprise me" always changes the card, and recently-used reflects the last applied design.
+- The details panel shows the structured calendar line once a date is picked, and the event sheet applies a category change from the UI.
 - Responsive widget layouts at **320, 390, 850, 1024 and 1440 pixels**, including mobile sheets/export setup.
 - Actual canvas drag/inline-edit gestures and undo, not only controller method calls.
-- Four retained upstream test files covering color, document JSON, hit testing, coordinates and history (14 upstream tests).
+- Four retained upstream test files covering color, document JSON, hit testing, coordinates and history.
 
 ## Browser workflows
 

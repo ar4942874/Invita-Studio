@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 import '../domain/category_music.dart';
+import '../domain/event_schedule.dart';
 import '../domain/invitation_template.dart';
 import '../domain/project.dart';
 import '../domain/video/timeline.dart';
+import '../services/catalog_prefs.dart';
 import '../services/draft_store.dart';
 import '../services/photo_service.dart';
 
@@ -19,8 +21,10 @@ class StudioController extends ChangeNotifier {
     required StudioProject project,
     required this.store,
     List<StudioProject>? drafts,
+    CatalogPrefs? catalog,
   }) : _project = project,
-       _drafts = drafts ?? [project] {
+       _drafts = drafts ?? [project],
+       catalog = catalog ?? const CatalogPrefs() {
     editor = CanvasEditorController(
       initialDocument: project.document,
       imageProvider: (ref) {
@@ -51,9 +55,9 @@ class StudioController extends ChangeNotifier {
       }
       notifyListeners();
     });
+    catalogLoaded = _loadCatalog();
     _scheduleSave();
   }
-
   static Future<StudioController> restore({ProjectStore? store}) async {
     final storage = store ?? LocalProjectStore();
     try {
@@ -79,6 +83,16 @@ class StudioController extends ChangeNotifier {
 
   late final CanvasEditorController editor;
   final ProjectStore store;
+
+  /// Favourites and recents for the design picker. Persisted separately from
+  /// the project because they describe the person, not one invitation.
+  final CatalogPrefs catalog;
+  final Set<String> _favourites = {};
+  final List<String> _recent = [];
+
+  /// Completes when the persisted favourites and recents have loaded. Tests
+  /// await it so a tap and the initial load cannot race.
+  late final Future<void> catalogLoaded;
   late final StreamSubscription<CanvasEditorState> _subscription;
   StudioProject _project;
   List<StudioProject> _drafts;
@@ -112,6 +126,47 @@ class StudioController extends ChangeNotifier {
     updatedAt: _project.updatedAt,
   );
   List<StudioProject> get drafts => List.unmodifiable(_drafts);
+
+  /// Designs the host starred.
+  Set<String> get favourites => Set.unmodifiable(_favourites);
+
+  /// Designs used recently, newest first.
+  List<String> get recentDesigns => List.unmodifiable(_recent);
+
+  bool isFavourite(String templateId) => _favourites.contains(templateId);
+
+  Future<void> _loadCatalog() async {
+    final favourites = await catalog.loadFavourites();
+    final recent = await catalog.loadRecent();
+    if (_disposed) return;
+    // Merge instead of replacing: a tap that lands while the preferences are
+    // still loading must not be lost.
+    _favourites.addAll(favourites);
+    final merged = [
+      ..._recent,
+      ...recent.where((id) => !_recent.contains(id)),
+    ];
+    _recent
+      ..clear()
+      ..addAll(merged.take(CatalogPrefs.maxRecent));
+    notifyListeners();
+  }
+
+  void toggleFavourite(String templateId) {
+    if (!_favourites.remove(templateId)) _favourites.add(templateId);
+    notifyListeners();
+    unawaited(catalog.saveFavourites(_favourites));
+  }
+
+  void _markUsed(String templateId) {
+    _recent
+      ..remove(templateId)
+      ..insert(0, templateId);
+    if (_recent.length > CatalogPrefs.maxRecent) {
+      _recent.removeRange(CatalogPrefs.maxRecent, _recent.length);
+    }
+    unawaited(catalog.saveRecent(_recent));
+  }
 
   /// The validated view of the project's timeline. Windows are clamped to the
   /// current duration and animations for deleted layers are dropped, so
@@ -277,8 +332,10 @@ class StudioController extends ChangeNotifier {
     }
   }
 
-  Future<void> chooseTemplate(InvitationTemplate target) =>
-      _reflow(target, format);
+  Future<void> chooseTemplate(InvitationTemplate target) {
+    _markUsed(target.id);
+    return _reflow(target, format);
+  }
   Future<void> chooseFormat(InvitationFormat target) =>
       _reflow(template, target, preserveStyle: true);
   Future<void> resetLayout() => _reflow(template, format, keepExtras: false);
@@ -754,6 +811,86 @@ class StudioController extends ChangeNotifier {
       video: VideoTimeline(audio: CategoryMusic.forCategory(category)),
     );
     await openProject(project);
+  }
+
+  /// Changes the celebration after creation.
+  ///
+  /// The category drives the wording defaults, the bundled tune and which
+  /// designs suit the card, so all three follow the change: a bundled tune is
+  /// swapped for the new celebration's tune (imported music is left alone), and
+  /// [template] — when given — is applied through the normal reflow, so words,
+  /// photos and custom layers survive.
+  Future<void> updateEventSettings({
+    required InvitationCategory category,
+    InvitationTemplate? template,
+  }) async {
+    if (_disposed) return;
+    var next = _project.copyWith(category: category);
+    final audio = next.video.audio;
+    if (audio != null && CategoryMusic.isTune(audio.assetId)) {
+      final tuneId = CategoryMusic.tuneId(category);
+      if (audio.assetId != tuneId) {
+        next = next.copyWith(
+          video: next.video.copyWith(
+            audio: audio.copyWith(
+              assetId: tuneId,
+              title: CategoryMusic.title(category),
+              durationMs: CategoryMusic.durationFor(category),
+              trimStartMs: 0,
+              trimEndMs: 0,
+            ),
+          ),
+        );
+      }
+    }
+    _project = next;
+    _upsert(next);
+    _scheduleSave();
+    notifyListeners();
+    if (template != null && template.id != this.template.id) {
+      await _reflow(template, format);
+    }
+  }
+
+  /// Stores (or clears) the structured event behind the date/time fields.
+  Future<void> setSchedule(EventDateTime? when) async {
+    _project = when == null
+        ? _project.copyWith(clearWhen: true)
+        : _project.copyWith(when: when);
+    _upsert(_project);
+    _scheduleSave();
+    notifyListeners();
+  }
+
+  /// Stores (or clears) the RSVP destination used for the invitation code.
+  Future<void> setRsvpUrl(String? url) async {
+    final trimmed = url?.trim() ?? '';
+    _project = trimmed.isEmpty
+        ? _project.copyWith(clearRsvpUrl: true)
+        : _project.copyWith(rsvpUrl: trimmed);
+    _upsert(_project);
+    _scheduleSave();
+    notifyListeners();
+  }
+
+  /// Copies [source] into a new draft and opens it.
+  ///
+  /// Duplicating is the "make a variation" workflow, so the copy becomes the
+  /// active draft; the original is untouched and stays in the list.
+  Future<StudioProject> duplicateProject(StudioProject source) async {
+    final id = 'p_${DateTime.now().microsecondsSinceEpoch}';
+    final copy = source.fork(id: id, title: _copyTitle(source.title));
+    await openProject(copy);
+    return copy;
+  }
+
+  static String _copyTitle(String title) {
+    const suffix = ' (copy)';
+    final room = 80 - suffix.length;
+    final base = title.length > room
+        ? title.substring(0, room).trimRight()
+        : title;
+    return '$base$suffix';
   }
   void _upsert(StudioProject value) {
     _drafts = [

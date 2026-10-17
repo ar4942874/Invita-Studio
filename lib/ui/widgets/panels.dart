@@ -3,7 +3,10 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 import '../../application/studio_controller.dart';
 import '../../domain/invitation_template.dart';
+import '../../services/invite_actions.dart';
 import '../../services/photo_service.dart';
+import '../invite_actions_sheet.dart';
+import '../schedule_picker.dart';
 import '../studio_theme.dart';
 import 'controls.dart';
 import 'document_preview.dart';
@@ -81,6 +84,67 @@ class DetailsPanel extends StatelessWidget {
       ],
     ),
   );
+  /// The date and time stay free text; the pickers write *into* them, so a host
+  /// can still type "Reception at 7:00 in the evening" by hand. The picker also
+  /// stores the structured value that the calendar and RSVP actions need.
+  Widget _scheduleFields(BuildContext context) {
+    final when = studio.project.when;
+    final locale = Localizations.localeOf(context).languageCode;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        field('date'),
+        field('time'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () => pickEventDate(context, studio),
+              icon: const Icon(Icons.calendar_month_outlined, size: 15),
+              label: const Text('Pick a date', style: TextStyle(fontSize: 11)),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => pickEventTime(context, studio),
+              icon: const Icon(Icons.schedule_outlined, size: 15),
+              label: const Text('Pick a time', style: TextStyle(fontSize: 11)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          when == null
+              ? 'Pick a date to unlock calendar and RSVP actions. Your typed '
+                    'wording stays exactly as it is.'
+              : 'Calendar: ${formatEventDate(when, locale)}'
+                    '${when.hasTime ? ' · ${formatEventTime(when, locale)}' : ''}',
+          style: const TextStyle(
+            fontSize: 9.5,
+            height: 1.4,
+            color: StudioColors.muted,
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => InviteActionsSheet.show(context, studio),
+            icon: const Icon(Icons.qr_code_2, size: 15),
+            label: const Text(
+              'Calendar file, link & RSVP code',
+              style: TextStyle(fontSize: 10.5),
+            ),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(23, 25, 23, 24),
@@ -151,8 +215,7 @@ class DetailsPanel extends StatelessWidget {
       field('second'),
       const Divider(),
       heading('02', 'The celebration'),
-      field('date'),
-      field('time'),
+      _scheduleFields(context),
       field('venue'),
       field('address'),
       const Divider(),
@@ -170,142 +233,370 @@ class DetailsPanel extends StatelessWidget {
   );
 }
 
-class TemplatesPanel extends StatelessWidget {
-  const TemplatesPanel({super.key, required this.studio});
-  final StudioController studio;
-  @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(23),
-    children: [
-      const SectionHeading(
-        'Find your feeling.',
-        subtitle: 'Three original designs. A world of possibilities.',
-      ),
-      const SizedBox(height: 20),
-      for (final template in invitationTemplates)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 17),
-          child: _TemplateTile(studio: studio, template: template),
-        ),
-      const HintBox(
-        'Switching a template keeps your words and custom text. Linked layers get the new design’s layout and styling. Undo brings everything back.',
-      ),
-    ],
-  );
+/// Which slice of the catalogue the picker is showing.
+enum _CatalogTab {
+  forYou('For you'),
+  all('All designs'),
+  favourites('Favourites'),
+  recent('Recent');
+
+  const _CatalogTab(this.label);
+  final String label;
 }
 
-class _TemplateTile extends StatelessWidget {
-  const _TemplateTile({required this.studio, required this.template});
+class TemplatesPanel extends StatefulWidget {
+  const TemplatesPanel({super.key, required this.studio});
   final StudioController studio;
-  final InvitationTemplate template;
+
   @override
-  Widget build(BuildContext context) {
-    final selected = studio.template.id == template.id;
-    final doc = template.createDocument(
-      documentId: 'thumbnail',
-      format: InvitationFormat.classic,
-      fields: fieldsFor(studio.document),
-    );
-    return Material(
-      color: selected
-          ? StudioColors.accentSoft.withValues(alpha: .55)
-          : StudioColors.wash,
-      borderRadius: BorderRadius.circular(11),
-      child: InkWell(
-        onTap: () {
-          FocusScope.of(context).unfocus();
-          studio.chooseTemplate(template);
-        },
-        borderRadius: BorderRadius.circular(11),
-        child: Container(
-          padding: const EdgeInsets.all(11),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? StudioColors.accent : StudioColors.border,
-              width: selected ? 1.4 : 1,
-            ),
-            borderRadius: BorderRadius.circular(11),
+  State<TemplatesPanel> createState() => _TemplatesPanelState();
+}
+
+/// The design catalogue: a grid with tabs, favourites, recents and a preview of
+/// what is currently applied.
+///
+/// Legacy layouts are never listed — they exist only so older drafts resolve.
+class _TemplatesPanelState extends State<TemplatesPanel> {
+  _CatalogTab _tab = _CatalogTab.forYou;
+
+  StudioController get _studio => widget.studio;
+
+  List<InvitationTemplate> get _designs {
+    final favourites = _studio.favourites;
+    final recent = _studio.recentDesigns;
+    return switch (_tab) {
+      _CatalogTab.forYou => templatesFor(_studio.project.category),
+      _CatalogTab.all => catalogueTemplates,
+      _CatalogTab.favourites => catalogueTemplates
+          .where((t) => favourites.contains(t.id))
+          .toList(),
+      _CatalogTab.recent => [
+        for (final id in recent)
+          for (final template in catalogueTemplates)
+            if (template.id == id) template,
+      ],
+    };
+  }
+
+  String get _emptyHint => switch (_tab) {
+    _CatalogTab.favourites => 'Star a design to keep it here.',
+    _CatalogTab.recent => 'Designs you use appear here.',
+    _ => 'No designs to show.',
+  };
+
+  Future<void> _surprise() async {
+    final pool = _designs.isEmpty
+        ? templatesFor(_studio.project.category)
+        : _designs;
+    final next = surpriseDesign(pool, current: _studio.template);
+    FocusScope.of(context).unfocus();
+    await _studio.chooseTemplate(next);
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _studio,
+    builder: (context, _) {
+      final designs = _designs;
+      return ListView(
+        padding: const EdgeInsets.all(23),
+        children: [
+          const SectionHeading(
+            'Find your feeling.',
+            subtitle:
+                'Ten designs for your celebration, sixty in the catalogue. '
+                'Your words stay put when you switch.',
           ),
-          child: Row(
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
-              SizedBox(
-                width: 75,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: DocumentPreview(document: doc),
+              for (final tab in _CatalogTab.values)
+                _FilterChip(
+                  label: tab.label,
+                  selected: _tab == tab,
+                  onTap: () => setState(() => _tab = tab),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                '${designs.length} '
+                '${designs.length == 1 ? 'design' : 'designs'}',
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  color: StudioColors.muted,
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              const Spacer(),
+              TextButton.icon(
+                onPressed: designs.isEmpty ? null : _surprise,
+                icon: const Icon(Icons.shuffle, size: 14),
+                label: const Text(
+                  'Surprise me',
+                  style: TextStyle(fontSize: 10.5),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  minimumSize: const Size(0, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _selectedPreview(),
+          const SizedBox(height: 16),
+          if (designs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              child: Text(
+                _emptyHint,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: StudioColors.muted,
+                ),
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = 10.0;
+                final width = (constraints.maxWidth - gap) / 2;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: 14,
                   children: [
-                    Text(
-                      template.name,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                    for (final template in designs)
+                      SizedBox(
+                        width: width,
+                        child: _DesignTile(
+                          studio: _studio,
+                          template: template,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      template.caption,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: StudioColors.muted,
-                      ),
-                    ),
-                    const SizedBox(height: 13),
-                    Row(
-                      children: [
-                        for (final c in [
-                          template.paper,
-                          template.ink,
-                          template.accent,
-                        ])
-                          Padding(
-                            padding: const EdgeInsets.only(right: 5),
-                            child: Container(
-                              width: 13,
-                              height: 13,
-                              decoration: BoxDecoration(
-                                color: decodeDocumentColor(c),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.black.withValues(alpha: .07),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (selected) ...[
-                      const SizedBox(height: 13),
-                      const Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            size: 12,
-                            color: StudioColors.accent,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Selected',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: StudioColors.accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
+                );
+              },
+            ),
+          const SizedBox(height: 10),
+          const HintBox(
+            'Switching a design keeps your words and custom text. Linked layers get the new design’s layout and styling. Undo brings everything back.',
+          ),
+        ],
+      );
+    },
+  );
+
+  /// The applied design, shown large enough to judge it with the host's own
+  /// words rather than a stock thumbnail.
+  Widget _selectedPreview() => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: StudioColors.wash,
+      borderRadius: BorderRadius.circular(11),
+      border: Border.all(color: StudioColors.border),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 62,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: ExcludeSemantics(
+              child: DocumentPreview(document: _studio.document),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const TinyLabel('Selected'),
+              const SizedBox(height: 4),
+              Text(
+                _studio.template.name,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _studio.template.caption,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: StudioColors.muted,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${_studio.format.label} · ${_studio.format.dimensions}',
+                style: const TextStyle(
+                  fontSize: 9,
+                  color: StudioColors.muted,
                 ),
               ),
             ],
           ),
         ),
+      ],
+    ),
+  );
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: selected ? StudioColors.accentSoft : StudioColors.wash,
+    borderRadius: BorderRadius.circular(20),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? StudioColors.accent : StudioColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected ? StudioColors.accent : StudioColors.ink,
+          ),
+        ),
       ),
+    ),
+  );
+}
+
+/// One design in the grid: the bundled thumbnail, its motif name, the palette
+/// it was drawn in, and a star.
+class _DesignTile extends StatelessWidget {
+  const _DesignTile({required this.studio, required this.template});
+
+  final StudioController studio;
+  final InvitationTemplate template;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = studio.template.id == template.id;
+    final favourite = studio.isFavourite(template.id);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Material(
+          color: StudioColors.wash,
+          borderRadius: BorderRadius.circular(9),
+          child: InkWell(
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              studio.chooseTemplate(template);
+            },
+            borderRadius: BorderRadius.circular(9),
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(
+                  color: selected ? StudioColors.accent : StudioColors.border,
+                  width: selected ? 1.6 : 1,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  AspectRatio(
+                    aspectRatio: 1080 / 1512,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: Image.asset(
+                        template.thumbnail,
+                        fit: BoxFit.cover,
+                        // The tile already names the design; a second label
+                        // here would be read twice.
+                        excludeFromSemantics: true,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Material(
+                      color: Colors.white.withValues(alpha: .82),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        tooltip: favourite
+                            ? 'Remove from favourites'
+                            : 'Save to favourites',
+                        onPressed: () => studio.toggleFavourite(template.id),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 28,
+                          height: 28,
+                        ),
+                        iconSize: 15,
+                        icon: Icon(
+                          favourite ? Icons.star : Icons.star_border,
+                          color: favourite
+                              ? StudioColors.accent
+                              : StudioColors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                template.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (selected)
+              const Icon(
+                Icons.check_circle,
+                size: 11,
+                color: StudioColors.accent,
+              ),
+          ],
+        ),
+        Text(
+          template.caption,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 8.5, color: StudioColors.muted),
+        ),
+      ],
     );
   }
 }

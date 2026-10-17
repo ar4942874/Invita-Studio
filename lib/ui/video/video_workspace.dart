@@ -117,7 +117,6 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
               projectId: widget.studio.project.id,
               assetId: audioId,
               title: timeline.audio?.title,
-              durationMs: timeline.audio?.durationMs ?? 0,
             )
           : await _store.loadAudio(
               widget.studio.project.id,

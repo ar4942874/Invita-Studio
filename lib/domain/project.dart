@@ -2,7 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
+import '../services/invite_actions.dart' show isValidRsvpUrl;
 import '../services/photo_service.dart';
+import 'event_schedule.dart';
 import 'invitation_template.dart';
 import 'video/timeline.dart';
 
@@ -24,6 +26,8 @@ class StudioProject {
     required this.document,
     this.video = VideoTimeline.defaults,
     this.category = InvitationCategory.wedding,
+    this.when,
+    this.rsvpUrl,
   });
   final String id, title;
   final DateTime updatedAt;
@@ -33,6 +37,14 @@ class StudioProject {
   /// The celebration chosen on the home screen. Additive to schema 2: older
   /// files without the key load as [InvitationCategory.wedding].
   final InvitationCategory category;
+
+  /// The event as structured data, alongside the free-text `date` and `time`
+  /// fields. Additive to schema 2: absent means the host typed prose only, and
+  /// the calendar/RSVP actions stay hidden.
+  final EventDateTime? when;
+
+  /// Optional RSVP destination the host supplies, used to draw the RSVP code.
+  final String? rsvpUrl;
 
   /// IDs of the layers that can be animated (the background is not a layer).
   Set<String> get layerIds => {
@@ -80,6 +92,10 @@ class StudioProject {
     DateTime? updatedAt,
     VideoTimeline? video,
     InvitationCategory? category,
+    EventDateTime? when,
+    bool clearWhen = false,
+    String? rsvpUrl,
+    bool clearRsvpUrl = false,
   }) => StudioProject(
     id: id,
     title: title ?? this.title,
@@ -87,7 +103,25 @@ class StudioProject {
     document: document ?? this.document,
     video: video ?? this.video,
     category: category ?? this.category,
+    when: clearWhen ? null : (when ?? this.when),
+    rsvpUrl: clearRsvpUrl ? null : (rsvpUrl ?? this.rsvpUrl),
   );
+
+  /// A copy under a new ID, for "Duplicate draft".
+  ///
+  /// The document ID must follow the project ID: the decoder requires them to
+  /// match, and it is what keeps embedded media namespaced per draft.
+  StudioProject fork({required String id, required String title}) =>
+      StudioProject(
+        id: id,
+        title: title,
+        updatedAt: DateTime.now(),
+        document: document.copyWith(id: id),
+        video: video,
+        category: category,
+        when: when,
+        rsvpUrl: rsvpUrl,
+      );
 
   Map<String, dynamic> toJson() => {
     'schema': 'invita.project',
@@ -98,6 +132,8 @@ class StudioProject {
     'updatedAt': updatedAt.toUtc().toIso8601String(),
     'document': document.toJson(),
     'video': video.toJson(),
+    if (when != null) 'when': when!.toJson(),
+    if (rsvpUrl != null) 'rsvpUrl': rsvpUrl,
   };
   String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
 
@@ -267,6 +303,13 @@ class StudioProject {
       final document = DesignDocument.fromJson(raw);
       // Version 1 projects have no `video` key and migrate to defaults.
       final video = VideoTimeline.decode(json['video']);
+      final when = json['when'] == null
+          ? null
+          : EventDateTime.decode(json['when']);
+      final rsvp = json['rsvpUrl'];
+      if (rsvp != null && (rsvp is! String || !isValidRsvpUrl(rsvp))) {
+        throw const FormatException('The RSVP link must be a web address.');
+      }
       final project = StudioProject(
         id: id,
         title: title,
@@ -278,6 +321,8 @@ class StudioProject {
         category:
             InvitationCategory.fromWire(json['category'] as String?) ??
             InvitationCategory.wedding,
+        when: when,
+        rsvpUrl: rsvp as String?,
       );
       final problems = project.effectiveVideo.validate(
         layerIds: project.layerIds,

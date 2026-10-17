@@ -124,7 +124,6 @@ class NativeVideoMediaService implements VideoMediaService {
     required String projectId,
     required String assetId,
     String? title,
-    int durationMs = 0,
   }) async {
     final path = await _store.audioPath(projectId, assetId, 'wav');
     final file = File(path);
@@ -140,7 +139,8 @@ class NativeVideoMediaService implements VideoMediaService {
     return ImportedAudio(
       assetId: assetId,
       title: title ?? assetId,
-      durationMs: durationMs,
+      // Measured from the bundled asset, never from the draft's stale value.
+      durationMs: CategoryMusic.durationForAsset(assetId),
       path: path,
     );
   }

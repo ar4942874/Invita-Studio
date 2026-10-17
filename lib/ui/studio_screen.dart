@@ -11,6 +11,9 @@ import '../application/studio_controller.dart';
 import '../domain/project.dart';
 import '../l10n/app_localizations.dart';
 import '../services/file_actions.dart';
+import 'event_settings_sheet.dart';
+import 'invite_actions_sheet.dart';
+import 'project_actions.dart';
 import 'studio_theme.dart';
 import 'widgets/artboard.dart';
 import 'widgets/controls.dart';
@@ -395,7 +398,9 @@ class _StudioScreenState extends State<StudioScreen>
                             leading: SizedBox(
                               width: 42,
                               height: 59,
-                              child: DocumentPreview(document: draft.document),
+                              child: ExcludeSemantics(
+                                child: DocumentPreview(document: draft.document),
+                              ),
                             ),
                             title: Text(
                               draft.title,
@@ -628,10 +633,18 @@ class _StudioScreenState extends State<StudioScreen>
                   Navigator.of(context).maybePop();
                 case 'drafts':
                   _drafts();
+                case 'event':
+                  EventSettingsSheet.show(context, studio);
+                case 'invite':
+                  InviteActionsSheet.show(context, studio);
                 case 'import':
                   _import();
                 case 'backup':
                   _backup();
+                case 'copy':
+                  saveProjectCopy(context, studio.project);
+                case 'duplicate':
+                  duplicateDraft(context, studio, studio.project);
                 case 'rename':
                   _rename();
                 case 'language':
@@ -647,6 +660,16 @@ class _StudioScreenState extends State<StudioScreen>
               return [
                 const PopupMenuItem(value: 'home', child: Text('Go to home')),
                 const PopupMenuItem(value: 'drafts', child: Text('My drafts')),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'event',
+                  child: Text('Event settings'),
+                ),
+                const PopupMenuItem(
+                  value: 'invite',
+                  child: Text('Invitation actions'),
+                ),
+                const PopupMenuDivider(),
                 const PopupMenuItem(
                   value: 'import',
                   child: Text('Open project JSON'),
@@ -654,6 +677,14 @@ class _StudioScreenState extends State<StudioScreen>
                 const PopupMenuItem(
                   value: 'backup',
                   child: Text('Export editable project'),
+                ),
+                const PopupMenuItem(
+                  value: 'copy',
+                  child: Text('Save a copy'),
+                ),
+                const PopupMenuItem(
+                  value: 'duplicate',
+                  child: Text('Duplicate draft'),
                 ),
                 const PopupMenuItem(
                   value: 'rename',
