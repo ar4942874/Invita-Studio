@@ -19,6 +19,7 @@
 8. Inline text commits when focus leaves; inline input is limited to 500 characters. Basic first-strong Arabic-script direction detection and a host-registered `NotoNaskhArabic` fallback are used in measurement, live editing and painting.
 9. First-drag selection can move the hit layer; dragging another layer no longer moves the old selection, and dragging empty paper does not move an unrelated layer. Drag origin is pointer-down; cancelled gestures commit the partial change.
 10. Minor formatting/lint fixes, including two unused callback-parameter names in an upstream test.
+11. `CanvasPainter` accepts an optional `nodeOpacities` map (node ID → 0..1) and is exported from the package entry point. Invita Studio's video preview and MP4 exporter animate layer opacity with it, so preview and encode share exactly the same painting code. The static editor passes no map and renders unchanged.
 
 `../../tool/vendor_patch.diff` records the exact Dart diff against the verified published archive. `UPSTREAM.json` records the changed paths and source digest. The patch is **already applied**; do not apply it again to this copy. To upgrade, compare a fresh upstream archive and re-review/retest the changes rather than blindly replacing the package.
 

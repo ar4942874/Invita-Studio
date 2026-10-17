@@ -4,8 +4,15 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 import '../services/photo_service.dart';
 import 'invitation_template.dart';
+import 'video/timeline.dart';
 
 class StudioProject {
+  /// Current on-disk schema. Version 1 projects (image only) are migrated on
+  /// load by filling in default video settings; version 2 projects are written
+  /// from now on.
+  static const int schemaVersion = 2;
+  static const int legacyVersion = 1;
+
   /// Projects may embed bounded photos, so the envelope is larger than JSON text.
   static const int maxProjectBytes = 12 * 1024 * 1024;
   static const int maxPhotoNodes = 8;
@@ -15,10 +22,39 @@ class StudioProject {
     required this.title,
     required this.updatedAt,
     required this.document,
+    this.video = VideoTimeline.defaults,
   });
   final String id, title;
   final DateTime updatedAt;
   final DesignDocument document;
+  final VideoTimeline video;
+
+  /// IDs of the layers that can be animated (the background is not a layer).
+  Set<String> get layerIds => {
+    for (final node in document.nodes)
+      if (node.type != 'background') node.id,
+  };
+
+  /// Video settings normalised against the current document: motions for
+  /// removed layers are dropped and windows are clamped to the duration.
+  VideoTimeline get effectiveVideo {
+    final motions = <String, LayerMotion>{};
+    for (final entry in video.motions.entries) {
+      if (!layerIds.contains(entry.key)) continue;
+      final motion = entry.value;
+      final start = motion.visibleStartMs
+          .clamp(0, video.durationMs - 200)
+          .toInt();
+      final end = motion.visibleEndMs
+          .clamp(start + 200, video.durationMs)
+          .toInt();
+      motions[entry.key] = motion.copyWith(
+        visibleStartMs: start,
+        visibleEndMs: end,
+      );
+    }
+    return video.copyWith(motions: motions);
+  }
 
   factory StudioProject.sample() {
     final id = 'p_${DateTime.now().microsecondsSinceEpoch}';
@@ -37,20 +73,23 @@ class StudioProject {
     String? title,
     DesignDocument? document,
     DateTime? updatedAt,
+    VideoTimeline? video,
   }) => StudioProject(
     id: id,
     title: title ?? this.title,
     updatedAt: updatedAt ?? DateTime.now(),
     document: document ?? this.document,
+    video: video ?? this.video,
   );
 
   Map<String, dynamic> toJson() => {
     'schema': 'invita.project',
-    'version': 1,
+    'version': schemaVersion,
     'id': id,
     'title': title,
     'updatedAt': updatedAt.toUtc().toIso8601String(),
     'document': document.toJson(),
+    'video': video.toJson(),
   };
   String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
 
@@ -64,10 +103,15 @@ class StudioProject {
     try {
       final json = jsonDecode(source);
       if (json is! Map<String, dynamic> ||
-          json['schema'] != 'invita.project' ||
-          json['version'] != 1) {
+          json['schema'] != 'invita.project') {
         throw const FormatException(
-          'This is not a supported Invita Studio project (version 1).',
+          'This is not an Invita Studio project.',
+        );
+      }
+      final version = json['version'];
+      if (version != legacyVersion && version != schemaVersion) {
+        throw const FormatException(
+          'This project was saved by a newer version of Invita Studio.',
         );
       }
       final id = json['id'];
@@ -213,14 +257,24 @@ class StudioProject {
         );
       }
       final document = DesignDocument.fromJson(raw);
-      return StudioProject(
+      // Version 1 projects have no `video` key and migrate to defaults.
+      final video = VideoTimeline.decode(json['video']);
+      final project = StudioProject(
         id: id,
         title: title,
         updatedAt:
             DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
             DateTime.now(),
         document: document,
+        video: video,
       );
+      final problems = project.effectiveVideo.validate(
+        layerIds: project.layerIds,
+      );
+      if (problems.isNotEmpty) {
+        throw FormatException(problems.first);
+      }
+      return project;
     } on FormatException {
       rethrow;
     } catch (_) {

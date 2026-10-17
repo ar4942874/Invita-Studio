@@ -15,6 +15,9 @@ import 'widgets/controls.dart';
 import 'widgets/document_preview.dart';
 import 'widgets/export_dialog.dart';
 import 'widgets/panels.dart';
+import 'video/video_export_dialog.dart';
+import 'video/video_settings_sheet.dart';
+import 'video/video_workspace.dart';
 
 class StudioScreen extends StatefulWidget {
   const StudioScreen({super.key, required this.studio});
@@ -26,6 +29,7 @@ class StudioScreen extends StatefulWidget {
 class _StudioScreenState extends State<StudioScreen>
     with WidgetsBindingObserver {
   int _tab = 0;
+  bool _videoMode = false;
   StudioController get studio => widget.studio;
   @override
   void initState() {
@@ -53,9 +57,26 @@ class _StudioScreenState extends State<StudioScreen>
     }
   }
 
+  void _setVideoMode(bool value) {
+    if (value == _videoMode) return;
+    FocusScope.of(context).unfocus();
+    if (value) {
+      final timeline = studio.video;
+      studio.updateVideo(timeline.copyWith(enabled: true));
+    }
+    setState(() => _videoMode = value);
+  }
+
+  void _openVideoSettings() => VideoSettingsSheet.show(context, studio);
+
   void _export() async {
     FocusScope.of(context).unfocus();
     await studio.flush();
+    if (!mounted) return;
+    if (_videoMode) {
+      await VideoExportDialog.show(context, studio);
+      return;
+    }
     if (mounted) {
       showDialog<void>(
         context: context,
@@ -533,6 +554,13 @@ class _StudioScreenState extends State<StudioScreen>
             const SizedBox(width: 20),
           ],
           const Spacer(),
+          if (!mobile) ...[
+            _ModeSwitch(
+              videoMode: _videoMode,
+              onChanged: _setVideoMode,
+            ),
+            const SizedBox(width: 14),
+          ],
           _saveStatus(compact: width < 1180),
           SizedBox(width: mobile ? 8 : 23),
           if (mobile && width >= 380)
@@ -640,7 +668,11 @@ class _StudioScreenState extends State<StudioScreen>
                         color: StudioColors.wash,
                         child: Row(
                           children: [
-                            const TinyLabel('YOUR INVITATION'),
+                            _ModeSwitch(
+                              videoMode: _videoMode,
+                              onChanged: _setVideoMode,
+                              compact: true,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: InkWell(
@@ -714,13 +746,20 @@ class _StudioScreenState extends State<StudioScreen>
                             const VerticalDivider(width: 1),
                           ],
                           Expanded(
-                            child: ArtboardWorkspace(
-                              studio: studio,
-                              onReset: _reset,
-                              onStyle: () => _showPanel(3),
-                              compact: mobile,
-                              hasInspector: inspector,
-                            ),
+                            child: _videoMode
+                                ? VideoWorkspace(
+                                    studio: studio,
+                                    onOpenSettings: _openVideoSettings,
+                                    onExport: _export,
+                                    compact: mobile,
+                                  )
+                                : ArtboardWorkspace(
+                                    studio: studio,
+                                    onReset: _reset,
+                                    onStyle: () => _showPanel(3),
+                                    compact: mobile,
+                                    hasInspector: inspector,
+                                  ),
                           ),
                           if (inspector) ...[
                             const VerticalDivider(width: 1),
@@ -819,6 +858,94 @@ class _StudioScreenState extends State<StudioScreen>
           ),
         );
       },
+    ),
+  );
+}
+
+class _ModeSwitch extends StatelessWidget {
+  const _ModeSwitch({
+    required this.videoMode,
+    required this.onChanged,
+    this.compact = false,
+  });
+
+  final bool videoMode;
+  final ValueChanged<bool> onChanged;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      color: StudioColors.wash,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: StudioColors.border),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _segment(
+          label: 'Image',
+          icon: Icons.image_outlined,
+          selected: !videoMode,
+          onTap: () => onChanged(false),
+        ),
+        _segment(
+          label: 'Video',
+          icon: Icons.play_circle_outline,
+          selected: videoMode,
+          onTap: () => onChanged(true),
+        ),
+      ],
+    ),
+  );
+
+  Widget _segment({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(6),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 7 : 9,
+        vertical: compact ? 4 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: selected ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: selected
+            ? const [
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 13,
+            color: selected ? StudioColors.green : StudioColors.muted,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              color: selected ? StudioColors.ink : StudioColors.muted,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

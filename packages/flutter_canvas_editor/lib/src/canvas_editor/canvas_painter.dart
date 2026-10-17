@@ -22,6 +22,11 @@ class CanvasPainter extends CustomPainter {
   /// overlay field, so the canvas must not paint a second copy underneath.
   final String? editingNodeId;
 
+  /// Per-node opacity (0..1) keyed by node ID. Used by hosts that animate
+  /// layers (for example Invita Studio's video exporter); nodes without an
+  /// entry are fully opaque.
+  final Map<String, double> nodeOpacities;
+
   CanvasPainter({
     required this.document,
     required this.coords,
@@ -30,6 +35,7 @@ class CanvasPainter extends CustomPainter {
     this.theme = const CanvasTheme(),
     this.devicePixelRatio = 1.0,
     this.editingNodeId,
+    this.nodeOpacities = const {},
   });
 
   @override
@@ -55,6 +61,17 @@ class CanvasPainter extends CustomPainter {
     // Clip to canvas bounds (document size) before drawing each node
     final docRect = Rect.fromLTWH(0, 0, document.width, document.height);
     final screenBounds = coords.docToScreenRect(docRect);
+    final opacity = (nodeOpacities[node.id] ?? 1.0)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    if (opacity <= 0.002) return;
+    final layered = opacity < 0.998;
+    if (layered) {
+      canvas.saveLayer(
+        screenBounds,
+        Paint()..color = Color.fromRGBO(0, 0, 0, opacity),
+      );
+    }
     canvas.save();
     canvas.clipRect(screenBounds);
 
@@ -106,6 +123,7 @@ class CanvasPainter extends CustomPainter {
     }
 
     canvas.restore(); // restore clipping and transform
+    if (layered) canvas.restore();
   }
 
   /// Selection chrome is supersampled so rotated edges stay smooth.
@@ -341,6 +359,15 @@ class CanvasPainter extends CustomPainter {
     return Offset.zero & src;
   }
 
+  static bool _sameOpacities(Map<String, double> a, Map<String, double> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
+
   @override
   bool shouldRepaint(covariant CanvasPainter old) =>
       old.document != document ||
@@ -351,7 +378,8 @@ class CanvasPainter extends CustomPainter {
       old.coords.viewportOffset != coords.viewportOffset ||
       old.devicePixelRatio != devicePixelRatio ||
       old.theme != theme ||
-      old.editingNodeId != editingNodeId;
+      old.editingNodeId != editingNodeId ||
+      !_sameOpacities(old.nodeOpacities, nodeOpacities);
 }
 
 /// Hit-test utilities for the canvas editor.

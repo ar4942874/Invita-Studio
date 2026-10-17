@@ -46,6 +46,21 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+## Video pipeline
+
+The video feature adds **no new package dependency** and links no third-party
+encoder:
+
+- Frames are encoded by the platform codecs (`MediaCodec`/`MediaMuxer` on
+  Android, `AVAssetWriter` on iOS); AAC audio likewise.
+- Import uses the platform media frameworks; imported clips are converted to a
+  JPEG proxy stored in app-managed storage.
+- `path_provider`, `file_selector` and `share_plus` were already dependencies of
+  the image editor and keep their existing licenses.
+- No FFmpeg, FFmpegKit, GPL codec or proprietary SDK is bundled or fetched at
+  runtime. `tool/reference_sample.py` is a development-only verification script
+  (Pillow + imageio-ffmpeg); it is not compiled into or called by the app.
+
 ## Bundled fonts — SIL Open Font License 1.1
 
 These are unmodified font files, locally bundled, not a claim that a fonts wrapper licenses font artwork.

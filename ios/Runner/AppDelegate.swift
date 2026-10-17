@@ -12,5 +12,11 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    VideoExportPlugin.register(
+      with: engineBridge.pluginRegistry.registrar(forPlugin: "VideoExportPlugin")
+    )
+    VideoMediaPlugin.register(
+      with: engineBridge.pluginRegistry.registrar(forPlugin: "VideoMediaPlugin")
+    )
   }
 }

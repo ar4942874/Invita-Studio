@@ -10,6 +10,7 @@ library;
 
 export 'src/shared/image_load_path.dart';
 export 'src/shared/text_direction.dart';
+export 'src/canvas_editor/canvas_painter.dart';
 export 'src/controller/canvas_editor_controller.dart';
 export 'src/controller/canvas_editor_state.dart';
 export 'src/widgets/canvas_editor_widget.dart';

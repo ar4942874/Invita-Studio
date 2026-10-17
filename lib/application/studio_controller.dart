@@ -7,6 +7,7 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 import '../domain/invitation_template.dart';
 import '../domain/project.dart';
+import '../domain/video/timeline.dart';
 import '../services/draft_store.dart';
 import '../services/photo_service.dart';
 
@@ -93,6 +94,21 @@ class StudioController extends ChangeNotifier {
     updatedAt: _project.updatedAt,
   );
   List<StudioProject> get drafts => List.unmodifiable(_drafts);
+
+  /// The validated view of the project's timeline. Windows are clamped to the
+  /// current duration and animations for deleted layers are dropped, so
+  /// preview, inspector and exporter all see the same motion.
+  VideoTimeline get video => _project.effectiveVideo;
+
+  /// Replaces the video timeline and schedules the usual debounced autosave.
+  /// Export always reads a frozen copy, so this is safe during export.
+  void updateVideo(VideoTimeline value) {
+    if (_disposed) return;
+    _project = _project.copyWith(video: value);
+    _upsert(_project);
+    _scheduleSave();
+    notifyListeners();
+  }
   DesignDocument get document => editor.document;
   InvitationTemplate get template => templateFor(document);
   InvitationFormat get format => formatFor(document);

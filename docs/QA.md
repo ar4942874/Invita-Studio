@@ -4,6 +4,33 @@
 **SDK:** Flutter 3.47.7 / Dart 3.13.5  
 **Environment:** Linux sandbox; real headless Chromium 156 via Playwright 1.64.1 for web checks.
 
+> **Scope note.** The table below is the recorded baseline for the image editor
+> (commit before the video increment). The video editor, MP4 exporter and both
+> native encoders were added afterwards and could **not** be built or run in
+> this sandbox: there is no Flutter/Dart SDK, JDK, Android SDK or Xcode, and
+> pub.dev / storage.googleapis.com are unreachable. The new Dart tests are
+> written but unexecuted. Read
+> [the video verification report](VIDEO.md) before treating any MP4 claim as
+> verified.
+
+## Video increment (source added, not executed here)
+
+| Check | Result |
+|---|---|
+| Dart syntax parse (tree-sitter-dart orchard grammar) over 71 repo files | 0 errors in new/modified video code; 1 pre-existing grammar ambiguity in `canvas_editor_controller.dart` |
+| Reference render: 15 s, 1080 × 1920, 30 fps, artwork + 10 animated layers | Playable MP4; 450 decoded video frames; 15.00 s |
+| Reference render with music | AAC-LC 44.1 kHz stereo; mean −23.2 dB, peak −13.6 dB |
+| Reference render without music | No audio stream |
+| Container | `isom`, `moov` before `mdat`, bt709 tags |
+| Timeline / project / media tests (`test/video_*_test.dart`, 3 files) | **Not executed** — no Dart/Flutter SDK |
+| `flutter analyze`, `flutter test`, `flutter build` | **Not executed** |
+| Android encoder, iOS encoder, share sheet, device playback | **Not executed** — no JDK/Android SDK/Xcode/device |
+
+The sample MP4s are produced by `tool/reference_sample.py`, a development-only
+renderer that reproduces the app's bundled artwork, fonts, layout constants and
+`evaluateTimeline` timings. They are **not** app output. See
+`docs/samples/README.md` for measured properties and regeneration commands.
+
 ## Executed successfully
 
 | Check | Result |
@@ -88,7 +115,9 @@ The browser’s `force` click option bypasses DOM overlap checks on Flutter’s 
 - Native share-sheet actions, Save to Photos/Files, iPad presentation, receiving apps, delivery/caption support and cancellation behavior on physical devices.
 - Safari/Firefox, every browser Web Share permission policy, low-memory phones, real mobile software-keyboard behavior or every font/language combination.
 - Full accessibility, collision detection, long-session performance, storage durability/security or print-prepress certification.
-- Photo cropping/filters, cloud/RSVP backend, animation or MP4.
+- Photo cropping/filters and the cloud/RSVP backend.
+- Everything native about the video feature: Android/iOS compilation, MediaCodec/AVAssetWriter encode, background-clip extraction, music muxing, device playback, cancellation on device, share sheets and delivery. The code exists; the runs do not.
+- Audible music in the in-app preview (music is baked into the export only).
 
 The first default build attempt ran parallel JavaScript/Wasm compilation and exceeded this 2 GB sandbox’s memory; it was stopped. The successfully built and browser-tested release uses JavaScript/O1 with the additional Wasm dry run disabled. Wasm output and O4 release performance were not validated.
 
@@ -99,3 +128,4 @@ The first default build attempt ran parallel JavaScript/Wasm compilation and exc
 3. Export all formats at 1×/2× with bundled fonts; check saved dimensions and artwork after repeated exports, rotation, undo and background/foreground transitions.
 4. Exercise cancellation, storage failures/quota, app-documents saving and actual receiving apps. Verify any system Photos action and its permission prompt.
 5. Replace debug signing, choose final app IDs, review notices/privacy text and perform release-store checks before production distribution.
+6. Video: import a clip and music, export Story/Square/Classic at both qualities on Android (API 24+) and iOS 15+, verify H.264/AAC/450-frame output with `ffprobe`/MediaInfo, cancel mid-export and confirm no partial file, kill the app mid-export, exercise missing-media relinking, and share the MP4 into at least two receiving apps.
