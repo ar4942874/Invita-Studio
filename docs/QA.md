@@ -16,7 +16,7 @@
 > everything that needs a real device: no APK/IPA, no native encode, no share
 > sheet. Treat native-only MP4 claims as source-only until then.
 
-## Video increment (suite runs, native not executed here)
+## Video increment (Dart suite runs; native pending)
 
 | Check | Result |
 |---|---|
@@ -41,7 +41,7 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 | Dependency resolution with `pubspec.lock` | Passed |
 | `flutter analyze` | **No issues found** |
 | `flutter test --concurrency=1 test packages/flutter_canvas_editor/test` | **64 passed** (image-editor baseline) |
-| Full suite including the video tests, later run on the project machine | **300 passed** |
+| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 13 test files pass** |
 | `flutter build web --release --no-web-resources-cdn --no-wasm-dry-run -O1` | **Built successfully** |
 | Real compiled-app browser workflow checks | **12 passed** |
 | Real compiled-app photo-card browser checks | **7 passed** |

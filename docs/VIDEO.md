@@ -218,7 +218,7 @@ from the managed directory, the browser returns in-memory PNG bytes.
 | Project JSON round-trip / v1 migration / validation tests | `test/video_project_test.dart` — pass on Flutter 3.47.7 / Dart 3.13.5 |
 | Timeline evaluation, easing, frame-index tests | `test/video_timeline_test.dart` — pass |
 | Media/manifest/frame-mapping/progress tests | `test/video_media_test.dart` — pass |
-| Full suite (300 tests), web export/import/music wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
+| Full suite (13 test files), web export/import/music wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
 
 ### Not executed (needs a real device or macOS/Windows toolchain)
 

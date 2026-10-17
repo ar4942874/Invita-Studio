@@ -23,7 +23,7 @@ The app integrates a locally vendored, improved version of the open-source [flut
 - **Bundled fonts:** Cormorant Garamond, DM Sans and Noto Naskh Arabic. Basic first-strong direction detection and an Arabic-script fallback are included. No runtime font CDN.
 - **Responsive UI:** desktop workspace, tablet layout and mobile editing sheets. No account, API key or backend is required.
 
-**Status:** both editors run. On this project machine (Flutter 3.47.7 / Dart 3.13.5) `flutter analyze` is clean, the full test suite passes (**300 tests**), and `flutter build web --release` succeeds. The browser build previews the animation (with music) and exports a real, **silent** WebM/MP4 through `MediaRecorder`. The native H.264/AAC encoders (`MediaCodec` on Android, `AVAssetWriter` on iOS) are implemented in source, but **no APK/IPA was built and no device encode, share sheet or device playback was executed** here. The sample MP4s in `docs/samples/` come from a Python reference renderer that mirrors the app's layout and timing — they validate the chosen container/codec/audio layout, not the app build. See [the video verification report](docs/VIDEO.md) and [QA](docs/QA.md) for the exact split between what was executed and what still needs a real device.
+**Status:** both editors run. On this project machine (Flutter 3.47.7 / Dart 3.13.5) `flutter analyze` is clean, the full Flutter test suite passes, and `flutter build web --release` succeeds. The browser build previews the animation (with music) and exports a real, **silent** WebM/MP4 through `MediaRecorder`. The native H.264/AAC encoders (`MediaCodec` on Android, `AVAssetWriter` on iOS) are implemented in source, but **no APK/IPA was built and no device encode, share sheet or device playback was executed** here. The sample MP4s in `docs/samples/` come from a Python reference renderer that mirrors the app's layout and timing — they validate the chosen container/codec/audio layout, not the app build. See [the video verification report](docs/VIDEO.md) and [QA](docs/QA.md) for the exact split between what was executed and what still needs a real device.
 
 ## Quick start
 
@@ -124,6 +124,7 @@ Future<void> openInvitationStudio(BuildContext context) async {
 ```sh
 flutter analyze
 flutter test --concurrency=1 test packages/flutter_canvas_editor/test
+flutter build web --release --no-web-resources-cdn --no-wasm-dry-run -O1
 
 # Start the compiled web server first, then run real-browser checks:
 npm ci --prefix tool/browser
@@ -132,7 +133,9 @@ node tool/browser/smoke.cjs
 node tool/browser/photo.cjs
 ```
 
-**Recorded result:** on the project machine (Flutter 3.47.7 / Dart 3.13.5) `flutter analyze` is clean and the full suite passes — **300 tests**, including the video model and exporter tests. **12 browser workflow checks** and **7 photo-card browser checks** passed against the compiled web build (recorded on the image-editor baseline; the scenarios they exercise are unchanged). Native Android/iOS compilation and device runs remain unexecuted. Actual downloaded PNG/JPEG signatures and dimensions were independently decoded and checked. The browser tests include live editing, photo import/styling/export, reflow, JSON backup/import, reload persistence, mobile editing/export, sharing-unavailable handling and operation without external network dependencies. See [QA results](docs/QA.md), [architecture](docs/ARCHITECTURE.md), and `docs/qa/` for evidence.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the first three commands on the pinned SDK (Flutter 3.47.7) for every push and pull request. The suite includes [`test/docs_consistency_test.dart`](test/docs_consistency_test.dart), which fails if these docs drift from the code (stale claims, SDK version, web palette, cited suite size).
+
+**Recorded result:** on the project machine (Flutter 3.47.7 / Dart 3.13.5) `flutter analyze` is clean and the full test suite passes — including the video model and exporter tests (see [QA](docs/QA.md) for the current count). **12 browser workflow checks** and **7 photo-card browser checks** passed against the compiled web build (recorded on the image-editor baseline; the scenarios they exercise are unchanged). Native Android/iOS compilation and device runs remain unexecuted. Actual downloaded PNG/JPEG signatures and dimensions were independently decoded and checked. The browser tests include live editing, photo import/styling/export, reflow, JSON backup/import, reload persistence, mobile editing/export, sharing-unavailable handling and operation without external network dependencies. See [QA results](docs/QA.md), [architecture](docs/ARCHITECTURE.md), and `docs/qa/` for evidence.
 
 ## Important boundaries
 

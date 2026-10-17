@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-test-build:
+    name: analyze, test, web build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to the validated SDK (Flutter 3.47.7 / Dart 3.13.5). See README.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          cache: true
+
+      - name: Toolchain versions
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      # Runs the app suite *and* the vendored engine suite, including
+      # test/docs_consistency_test.dart which fails if the docs drift from code.
+      - name: Test
+        run: flutter test --concurrency=1 test packages/flutter_canvas_editor/test
+
+      - name: Build web release
+        run: flutter build web --release --no-web-resources-cdn --no-wasm-dry-run -O1
