@@ -14,7 +14,13 @@ The host is a Flutter application with a `ChangeNotifier` coordinator. No second
 | `lib/app.dart` | Standalone Material app |
 | `lib/invitation_studio.dart` | Public host integration exports |
 | `lib/domain/invitation_template.dart` | Field IDs, original template layouts, formats, text fitting, font definitions |
-| `lib/domain/project.dart` | Versioned project envelope and guarded JSON import |
+| `lib/domain/project.dart` | Versioned project envelope (schema 2), v1 migration, guarded JSON import, effective video view |
+| `lib/domain/video/timeline.dart` | Flutter-free video model: duration, background clip, layer windows/effects, music, deterministic evaluation |
+| `lib/services/video/frame_renderer.dart` | Shared preview/export painter, clipped background-frame LRU, export frame feed |
+| `lib/services/video/video_media.dart` | Managed media storage, clip manifests, native probe/extraction channel |
+| `lib/services/video/video_encoder.dart` | Encoder spec/session interface and the native `invita/video_export` backend |
+| `lib/services/video/video_export_service.dart` | Frozen-snapshot exporter, progress, cancellation, temp cleanup |
+| `lib/ui/video/` | Video workspace, preview, transport, settings sheet and MP4 export dialog |
 | `lib/application/studio_controller.dart` | Serialized host edits, two-way field state, reflow, styling, layer actions, drafts and save status |
 | `lib/services/draft_store.dart` | Replaceable `ProjectStore`; local preferences implementation and memory test implementation |
 | `lib/services/export_service.dart` | Frozen-document PNG capture, filenames, dimensions and export metadata |
@@ -69,12 +75,38 @@ Importer allowlists supported document sizes, the exact bundled background for t
 
 Preferences and browser storage are not encrypted or cross-device synchronization. Project exports contain personal invitation details in plain JSON. Hosting RSVP collection, backups/sync or accounts requires a separate product/security design.
 
+## Video timeline and export
+
+Video mode is a second **view over the same document**, not a second project. `StudioController` keeps one `DesignDocument`; `StudioProject` gains a `video` field (schema 2) whose layer keys are existing node IDs. Edits made in either mode therefore update the other instantly, and no field data is duplicated.
+
+`VideoTimeline` is deliberately Flutter-free and versioned. `evaluateTimeline(timeline, layerIds, timeMs)` is the only animation evaluator; it returns opacity, offset and uniform scale per layer. The same function feeds the live preview and the exporter. Entrance effects settle at their neutral value; exits run the same effect away from it. Layers without an entry are visible for the whole timeline.
+
+`TimelineFrameRenderer.paintFrame` is shared by the preview (`VideoFramePainter`) and the exporter (`renderImage` → raw RGBA):
+
+1. the background node (bundled artwork and its colour),
+2. the fitted imported clip frame (cover/contain/fill matches photo-layer maths),
+3. animated layers painted by `CanvasPainter` with per-node opacity.
+
+The engine's only change is opt-in: `nodeOpacities` wraps a layer in `saveLayer` only when it is actually translucent. Static editing is unchanged.
+
+### Determinism and memory
+
+Export timestamps are `frameIndex * 1e6 ~/ fps`; wall-clock playback is confined to `VideoPlaybackController`, which only drives the UI. The exporter copies the node list and motion map before its first `await`, renders one frame at a time, awaits the native `addFrame` before rendering the next, and keeps at most two decoded background frames. Cancellation is checked between frames; failures delete the partial file and dispose images in `finally`.
+
+### Native services
+
+Two platform channels sit behind plain Dart interfaces:
+
+* `invita/video_media` — probe video/audio, extract a bounded JPEG proxy sequence (≤900 frames, ≤1080×1920) with progress and cancellation.
+* `invita/video_export` — open a session, `addFrame` (RGBA8888 + timestamp), `finish`, `cancel`.
+
+Android implements the encoder with `MediaCodec`/`MediaMuxer` (H.264 Baseline preferred, AAC-LC 128 kb/s) and applies music trim/gain/fades while decoding to PCM. iOS uses `AVAssetWriter` and, for music, an `AVMutableComposition` second pass with passthrough when no gain/fade is needed. Web/desktop have no encoder: `isVideoExportSupported` is false and the dialog explains that only preview/editing is available.
+
+Imported media lives under `<documents>/InvitaStudioMedia/<projectId>/` with a JSON manifest per clip. Project JSON stores IDs and trims only, so projects stay small; the trade-off is that portable JSON does not carry media and must be relinked. Missing media is a first-class state in the preview and settings sheet.
+
 ## Native integration boundary
 
-Android/iOS folders are real Flutter scaffolds with plugin dependencies and platform configuration. Android minimum SDK is 24; iOS deployment target is 15. Sharing uses `SharePlus.instance.share` with correctly typed PNG/JPEG files and a presentation origin. Mobile saving writes into app documents; the UI does not claim silent gallery writes.
+Android/iOS folders are real Flutter scaffolds with plugin dependencies and platform configuration. Android minimum SDK is 24; iOS deployment target is 15. Sharing uses `SharePlus.instance.share` with correctly typed files and a presentation origin. Mobile saving writes into app documents; the UI does not claim silent gallery writes.
 
-Native builds, permissions/share actions, foreground/background behavior and receiver-app delivery require actual Android/iOS testing. They were not simulated by claiming web tests validate native plugins.
+The video plugins are registered explicitly: `MainActivity.configureFlutterEngine` attaches both Kotlin handlers, and `AppDelegate.didInitializeImplicitFlutterEngine` registers both Swift plugins. Native builds, permissions/share actions, foreground/background behavior and receiver-app delivery require actual Android/iOS testing. They were not simulated by claiming web tests validate native plugins.
 
-## Later MP4 work
-
-Keep the editable document independent from output media. An animation increment should introduce explicit scene timing, deterministic interpolation/effects and a platform video compositor/encoder proof of concept. High-resolution frame buffers must be bounded. This source contains no video exporter, placeholder MP4 button, retired FFmpegKit binding or GPL FFmpeg dependency.

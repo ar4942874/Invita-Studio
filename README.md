@@ -1,6 +1,6 @@
 # Invita Studio
 
-**A working, image-first Flutter invitation editor—not a mockup or an embedded JavaScript editor.**
+**A working Flutter invitation studio with an image editor and an animated video editor that exports real MP4 files—not a mockup or an embedded JavaScript editor.**
 
 The app integrates a locally vendored, improved version of the open-source [flutter_canvas_editor 1.2.0](https://pub.dev/packages/flutter_canvas_editor/versions/1.2.0) engine (BSD-3-Clause). The surrounding invitation workflow, original artwork, export services and responsive Flutter interface are implemented in this project.
 
@@ -14,10 +14,12 @@ The app integrates a locally vendored, improved version of the open-source [flut
 - **High-resolution PNG and real JPEG:** 1× or 2×; up to **2160 × 3840** for Story. Export uses a frozen document snapshot, not a screenshot of the screen. Editing handles and viewport zoom are excluded.
 - **Local drafts and portable projects:** debounced autosave, multiple drafts (up to 12), rename, import/export versioned editable JSON, and strict import validation.
 - **Save/share plumbing:** browser Blob downloads; app-documents saving and `share_plus` native file sharing with an iPad share anchor. Native device behavior still needs validation.
+- **Video invitations (Android/iOS):** switch to **Video** to animate the same invitation. Play/pause, scrubbing, timecode, a ruler with per-layer tracks, 5–30 s length, visible windows, and fade / slide / zoom entrances and exits with duration, delay and easing. Import a background clip (trim, fit, loop) and optional music (trim, start offset, volume/mute, fades).
+- **Real MP4 export:** frames are rendered offscreen with the same painter as the preview, timestamped by frame index (never by playback time) and streamed one at a time to a native H.264 encoder (`MediaCodec` on Android, `AVAssetWriter` on iOS), with AAC music when enabled. 1080 × 1920 @ 30 fps for Story, 540 × 960 lighter option; Classic and Square keep their aspect ratio. Progress, cancellation, error reporting and partial-file cleanup are implemented. Silent and muted exports explicitly have **no audio track**.
 - **Bundled fonts:** Cormorant Garamond, DM Sans and Noto Naskh Arabic. Basic first-strong direction detection and an Arabic-script fallback are included. No runtime font CDN.
 - **Responsive UI:** desktop workspace, tablet layout and mobile editing sheets. No account, API key or backend is required.
 
-**Status:** functional image-editor implementation with a tested Flutter web release. Android/iOS source projects and native integrations are included, but no Android/iOS binary, physical-device sharing test or store-ready release is claimed. Animated MP4 is deliberately not implemented in this increment.
+**Status:** the image editor is a tested Flutter web release. The video editor, native media pipeline and both MP4 encoders are implemented in source, but this branch was prepared in a sandbox without a Flutter/Dart SDK, JDK, Android SDK or Xcode. Therefore `flutter analyze`/`flutter test` were **not** re-run on the video increment, no APK/IPA was built, and no native encoder, share sheet or device playback was executed. The sample MP4s in `docs/samples/` come from a Python reference renderer that mirrors the app's layout and timing — they validate the chosen container/codec/audio layout, not the app build. See [the video verification report](docs/VIDEO.md).
 
 ## Quick start
 
@@ -65,8 +67,11 @@ flutter run -d <device-id>
 2. Choose **Templates**, or select Classic / Story / Square above the canvas.
 3. Tap a text layer to select it; drag to position, use handles to resize/rotate, and tap it again to edit inline. On mobile use the bottom **Style** or **Layers** buttons.
 4. Use the inspector to change typography and ink. With nothing selected, it styles both names. Linked invitation layers cannot be deleted; clear their text to hide them. Custom text can be deleted.
-5. Choose **Export → Create PNG/JPEG → Download/Save or Share**. Preparing the file before the final action preserves a fresh browser user gesture. Out-of-document text is flagged before image export.
-6. Use **Project options → Export editable project** for a backup. Import with **Open project JSON**. A flattened PNG/JPEG is not an editable project.
+5. Switch to **Video** (header on desktop, above the canvas on mobile) to animate the same wording and layout. Play or scrub, select a layer in the timeline, then set its visible window and `In`/`Out` effect. **Video settings** (tune icon) controls length, background clip and music. **Export MP4** opens the encoder dialog.
+6. Choose **Export → Create PNG/JPEG → Download/Save or Share**. Preparing the file before the final action preserves a fresh browser user gesture. Out-of-document text is flagged before image export.
+7. Use **Project options → Export editable project** for a backup. Import with **Open project JSON**. A flattened PNG/JPEG or MP4 is not an editable project.
+
+Video notes: imported clips and music are stored in the app's managed media directory, not inside the project JSON. Project JSON is therefore a layout/word backup — to move a video project to another device, copy `InvitaStudioMedia/<projectId>/` with it. Missing media is reported in the preview and the settings sheet instead of crashing. Music is baked into the MP4 but is not audible in the in-app preview (no audio-playback plugin was added). Web and desktop can preview and edit timing but cannot encode; the dialog says so instead of faking an export.
 
 Long form values shrink to the existing text area without truncation. After substantially shortening a previously long value, use the size control or Reset layout to grow the text again. Manual edits can still cause visual overlaps; inspect the preview. Reset layout removes custom text and restores the linked layout/styles, but can be undone.
 
@@ -123,11 +128,14 @@ node tool/browser/smoke.cjs
 node tool/browser/photo.cjs
 ```
 
-**Recorded result:** analyzer clean; **64 Flutter tests passed**; **12 browser workflow checks passed**; **7 photo-card browser checks passed**. Actual downloaded PNG/JPEG signatures and dimensions were independently decoded and checked. The browser tests include live editing, photo import/styling/export, reflow, JSON backup/import, reload persistence, mobile editing/export, sharing-unavailable handling and operation without external network dependencies. See [QA results](docs/QA.md), [architecture](docs/ARCHITECTURE.md), and `docs/qa/` for evidence.
+**Recorded result (image-editor baseline commit, before the video increment):** analyzer clean; **64 Flutter tests passed**; **12 browser workflow checks passed**; **7 photo-card browser checks passed**. This environment has no Flutter/Dart/Android SDK, so the command list above and the three new video test files were **not executed here**; they are the acceptance commands for a machine that has the SDK. See [QA](docs/QA.md) and [video verification](docs/VIDEO.md) for the exact split between baseline results and unverified work. Actual downloaded PNG/JPEG signatures and dimensions were independently decoded and checked. The browser tests include live editing, photo import/styling/export, reflow, JSON backup/import, reload persistence, mobile editing/export, sharing-unavailable handling and operation without external network dependencies. See [QA results](docs/QA.md), [architecture](docs/ARCHITECTURE.md), and `docs/qa/` for evidence.
 
 ## Important boundaries
 
-- This increment edits text and your own photos over bundled artwork. Photos are downscaled (≤1600 px), re-encoded as bounded data URLs and embedded in the project; filters, freehand drawing, QR generation, cloud sync, hosted RSVP collection, PDF/CMYK/bleed workflows and MP4 export are **not implemented**.
+- The image editor edits text and your own photos over bundled artwork. Photos are downscaled (≤1600 px), re-encoded as bounded data URLs and embedded in the project; filters, freehand drawing, QR generation, cloud sync, hosted RSVP collection and PDF/CMYK/bleed workflows are **not implemented**.
+- The video editor is single-scene, 5–30 s at a fixed 30 fps, with one entrance and one exit per layer (opacity, translate, uniform scale). It is not a multi-scene NLE and has no keyframe tracks, masks, rotation animation or per-word effects.
+- MP4 export runs only on Android/iOS. Web/desktop preview and timing editing work, but the encoder is unavailable and the UI says so. No Android/iOS binary, device encode, share-sheet or delivery test is claimed in this branch.
+- Portable JSON projects do **not** bundle imported video or music; media must be relinked on another device. The MP4 is written to the app documents directory and handed to the system share sheet — saving to Photos/Gallery is an OS action, not something this app can confirm.
 - RSVP and location are display text, not a backend or response-collection service.
 - Browser sharing requires browser/OS support and a permitted secure context. If unavailable, the UI directs the user to download. Native sharing is wired, not device-certified.
 - Drafts use local preferences/browser storage, **not encrypted cloud storage**. Clearing app/browser data, storage eviction, private-mode restrictions, quota limits or abrupt closure can lose drafts, including very recent debounced edits. Export JSON backups for important work.
@@ -136,10 +144,10 @@ node tool/browser/photo.cjs
 
 ## Open-source provenance
 
-App code and original artwork: **MIT**, except third-party components. The vendored engine and its local modifications remain **BSD-3-Clause**; the fonts retain **SIL OFL 1.1**. Full notices and upstream provenance are retained. No unlicensed invitation-app code, proprietary editor, FFmpeg binary or GPL video dependency was copied in.
+App code and original artwork: **MIT**, except third-party components. The vendored engine and its local modifications remain **BSD-3-Clause**; the fonts retain **SIL OFL 1.1**. Full notices and upstream provenance are retained. No unlicensed invitation-app code, proprietary editor, FFmpeg binary or GPL video dependency was copied in. The video pipeline adds **no new package dependency**: it uses the already-present `path_provider`, `file_selector` and `share_plus`, and the platform H.264/AAC encoders shipped with Android and iOS. The Python reference renderer in `tool/reference_sample.py` is a development aid only (Pillow + imageio-ffmpeg are not app dependencies).
 
 See [third-party notices](THIRD_PARTY_NOTICES.md), `packages/flutter_canvas_editor/UPSTREAM.md`, its original `LICENSE`, the exact local `tool/vendor_patch.diff`, and `assets/fonts/*-OFL.txt`. Original artwork is reproducibly generated by `tool/generate_art.py` (optional Pillow dependency); it is already bundled.
 
 ## Next increment
 
-After Android/iOS export/share device checks, consider photo filters/cropping, an animation scene model and a native MP4 proof of concept. Keep the editable document separate from rendered images/video. The previous research bundle remains separate from this implemented source project.
+The next step is verification, not more surface area: build on a real Android device (API 24+) and an iOS 15+ device, export Story/Square/Classic at both qualities, inspect the files with `ffprobe`/MediaInfo, test cancellation and app-kill recovery, and exercise the share sheet into at least two receiving apps. Then replace the debug signing configuration and choose final app IDs. After that, consider multi-scene sequencing and richer per-layer animation. See [docs/VIDEO.md](docs/VIDEO.md#required-device-checks-before-claiming-completion).
