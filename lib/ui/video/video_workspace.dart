@@ -183,13 +183,12 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
         Expanded(
           child: ColoredBox(
             color: StudioColors.canvas,
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: widget.compact ? 330 : 360,
-                    maxHeight: 640,
                   ),
                   child: VideoPreview(
                     studio: widget.studio,

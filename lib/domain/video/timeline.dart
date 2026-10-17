@@ -243,8 +243,9 @@ enum MotionPreset {
   final String label;
   final String tagline;
 
-  /// Entrance length shared by every preset.
-  static const int entranceMs = 1000;
+  /// Entrance length shared by every preset. Deliberately unhurried so the
+  /// card glides into place instead of snapping.
+  static const int entranceMs = 1800;
 
   /// Builds the per-layer motions a preset writes over a clean window.
   ///
@@ -279,7 +280,7 @@ enum MotionPreset {
     final maxDelay = (span - entranceMs).clamp(0, 10000);
     int staggerDelay(int index) {
       if (count <= 1) return 0;
-      final step = (maxDelay / (count - 1)).floor().clamp(0, 220);
+      final step = (maxDelay / (count - 1)).floor().clamp(0, 320);
       return (index * step).clamp(0, maxDelay).toInt();
     }
 
