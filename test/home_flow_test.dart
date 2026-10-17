@@ -76,7 +76,9 @@ void main() {
 
     // Step 3: pick a card and create.
     expect(find.text('Choose a card'), findsWidgets);
-    await tester.tap(find.text(invitationTemplates.first.name).first);
+    final birthdayDesigns = templatesFor(InvitationCategory.birthday);
+    expect(birthdayDesigns.length, 10);
+    await tester.tap(find.text(birthdayDesigns.first.name).first);
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Create invitation'));
     await tester.pumpAndSettle();
@@ -88,7 +90,9 @@ void main() {
     expect(studio.project.category, InvitationCategory.birthday);
     expect(studio.project.title, 'Sana & Hamza');
     expect(studio.fieldValue('first'), 'Sana');
-    expect(templateFor(studio.document).id, invitationTemplates.first.id);
+    expect(templateFor(studio.document).id, birthdayDesigns.first.id);
+    // The birthday tune is pre-selected.
+    expect(studio.project.video.audio?.assetId, 'tune_birthday');
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump();

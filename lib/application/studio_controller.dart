@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
+import '../domain/category_music.dart';
 import '../domain/invitation_template.dart';
 import '../domain/project.dart';
 import '../domain/video/timeline.dart';
@@ -294,9 +295,9 @@ class StudioController extends ChangeNotifier {
   }) {
     final targets = _styleTargets;
     return _enqueue(() async {
-      final nodes = document.nodes.map((node) {
+      var nodes = document.nodes.map((node) {
         if (node is! TextNode || !targets.contains(node.id)) return node;
-        var next = node.copyWith(
+        final next = node.copyWith(
           fontFamily: fontFamily,
           fontSize: fontSize?.clamp(8, 240),
           textColor: color,
@@ -307,7 +308,7 @@ class StudioController extends ChangeNotifier {
           text: TextSpan(text: next.text, style: nodeTextStyle(next)),
           textDirection: invitationTextDirection(next.text),
         )..layout(maxWidth: next.frame.width);
-        next = next.copyWith(
+        final sized = next.copyWith(
           frame: Rect.fromLTWH(
             next.frame.left,
             next.frame.top,
@@ -316,14 +317,149 @@ class StudioController extends ChangeNotifier {
           ),
         );
         painter.dispose();
-        return next;
+        return sized;
       }).toList();
+      // Growing (or shrinking) a field re-stacks the linked wording so the
+      // card never overlaps or spills off the page.
+      if (fontSize != null) nodes = _reflowStack(nodes);
       await editor.applyDocument(
         document.copyWith(nodes: nodes),
         recordUndo: recordUndo,
       );
     });
   }
+
+  /// Vertical order of the linked wording when the card is re-stacked.
+  static const _stackOrder = [
+    'header',
+    'first',
+    'amp',
+    'second',
+    'message',
+    'date',
+    'time',
+    'venue',
+    'address',
+    'rsvp',
+  ];
+
+  /// Gaps between stacked fields as a fraction of the card height. Tuned so an
+  /// untouched card looks like the original template.
+  static const _stackGaps = <String, double>{
+    'header>first': .030,
+    'first>amp': .004,
+    'amp>second': .004,
+    'second>message': .034,
+    'message>date': .030,
+    'date>time': .010,
+    'time>venue': .032,
+    'venue>address': .010,
+    'address>rsvp': .040,
+  };
+
+  /// Re-positions the linked text fields as a single vertical stack.
+  ///
+  /// Fields keep their horizontal placement and width; only the vertical order
+  /// and spacing change so a larger field pushes its siblings instead of
+  /// overlapping them. The stack is anchored to the opening line's position,
+  /// then shifted up and its gaps compressed until it fits the page margins.
+  List<DesignNode> _reflowStack(List<DesignNode> nodes) {
+    final byId = <String, TextNode>{
+      for (final node in nodes.whereType<TextNode>()) node.id: node,
+    };
+    final present = _stackOrder.where(byId.containsKey).toList();
+    if (present.length < 2) return nodes;
+
+    final docHeight = document.height;
+    final topMargin = docHeight * .05;
+    final bottomMargin = docHeight * .05;
+    final anchor = byId[present.first]!.frame.top;
+
+    double heightOf(TextNode node) {
+      final painter = TextPainter(
+        text: TextSpan(text: node.text, style: nodeTextStyle(node)),
+        textDirection: invitationTextDirection(node.text),
+      )..layout(maxWidth: math.max(2, node.frame.width));
+      final height = math.max(20.0, painter.height);
+      painter.dispose();
+      return height;
+    }
+
+    final heights = {for (final id in present) id: heightOf(byId[id]!)};
+    final content = heights.values.fold<double>(0, (sum, h) => sum + h);
+
+    /// Positions the stack with the field gaps scaled by [k] (1 = full gaps).
+    ({Map<String, double> tops, double end}) layout(double k) {
+      final tops = <String, double>{};
+      var cursor = anchor;
+      for (var i = 0; i < present.length; i++) {
+        final id = present[i];
+        if (i > 0) {
+          final gap = (_stackGaps['${present[i - 1]}>$id'] ?? .02) * k * docHeight;
+          cursor += gap;
+        }
+        tops[id] = cursor;
+        cursor += heights[id]!;
+      }
+      return (tops: tops, end: cursor);
+    }
+
+    void shiftUp(Map<String, double> tops, double amount) {
+      if (amount <= 0) return;
+      for (final id in present) {
+        tops[id] = tops[id]! - amount;
+      }
+    }
+
+    final bottomLimit = docHeight - bottomMargin;
+    double endOf(Map<String, double> tops) =>
+        tops[present.last]! + heights[present.last]!;
+
+    var result = layout(1);
+    var tops = result.tops;
+    if (result.end > bottomLimit) {
+      final firstTop = tops[present.first]!;
+      final shift = math.min(
+        result.end - bottomLimit,
+        math.max(0.0, firstTop - topMargin),
+      );
+      shiftUp(tops, shift);
+    }
+    if (endOf(tops) > bottomLimit) {
+      // Compress the gaps when the stack still overflows the bottom margin.
+      final available = bottomLimit - topMargin;
+      final fullGaps = (result.end - anchor) - content;
+      if (fullGaps > 0 && available > content) {
+        final k = ((available - content) / fullGaps).clamp(0.0, 1.0);
+        result = layout(k);
+        tops = result.tops;
+        final firstTop = tops[present.first]!;
+        shiftUp(
+          tops,
+          math.min(
+            math.max(0.0, result.end - bottomLimit),
+            math.max(0.0, firstTop - topMargin),
+          ),
+        );
+      }
+    }
+
+    return [
+      for (final node in nodes)
+        if (node is TextNode && tops.containsKey(node.id))
+          node.copyWith(
+            frame: Rect.fromLTWH(
+              node.frame.left,
+              tops[node.id]!,
+              node.frame.width,
+              heights[node.id]!,
+            ),
+          )
+        else
+          node,
+    ];
+  }
+
 
   Future<void> editSelected(String value) async {
     final selected = selectedText;
@@ -512,6 +648,9 @@ class StudioController extends ChangeNotifier {
         format: format,
         fields: fields,
       ),
+      // Each celebration starts with its bundled tune already chosen; the
+      // video settings sheet can swap or remove it.
+      video: VideoTimeline(audio: CategoryMusic.forCategory(category)),
     );
     await openProject(project);
   }

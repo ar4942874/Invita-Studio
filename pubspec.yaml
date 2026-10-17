@@ -29,6 +29,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/art/
+    - assets/music/
     - assets/fonts/CormorantGaramond-OFL.txt
     - assets/fonts/DMSans-OFL.txt
     - assets/fonts/NotoNaskhArabic-OFL.txt

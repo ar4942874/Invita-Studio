@@ -48,8 +48,10 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 
 ## Flutter test coverage
 
-- Every design across all three formats (27 combinations): complete IDs, dimensions and editable project roundtrip.
-- Category-tagged designs sort ahead of the universal favourites and every bundled design ships art for each format plus a thumbnail.
+- Every design across all three formats (9 legacy + 60 category designs = 207 combinations): complete IDs, dimensions and editable project roundtrip.
+- Each celebration offers exactly ten of its own designs; every bundled design ships art for each format plus a thumbnail and every category ships a bundled tune.
+- Growing a field re-stacks the linked wording into a single column with no vertical overlap that stays inside the page.
+- Creating a project from a category pre-selects that category's bundled tune.
 - Photo layers: downscale/encode preparation, add/select/fit/delete, persistence and rejection of remote references, filesystem paths, sub-background ordering and unknown fit modes.
 - Text fitting without ellipsis or loss of wording; basic first-strong direction cases.
 - Rejection of filesystem/remote image references, unknown node/font types, duplicate IDs, oversized canvases/fonts/input and missing linked fields.

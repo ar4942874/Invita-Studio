@@ -347,7 +347,10 @@ class InvitationTemplate {
   }
 }
 
-const invitationTemplates = [
+/// The original artwork set. Kept so older drafts (whose backgrounds reference
+/// these IDs) stay valid and exportable; it is no longer offered on the card
+/// step, which now shows the per-category collection below.
+const _legacyTemplates = [
   InvitationTemplate(
     'botanical',
     'Botanical vows',
@@ -381,7 +384,6 @@ const invitationTemplates = [
     '#FFF6EFDC',
     '#FFC8A24B',
     dark: true,
-    categories: {InvitationCategory.wedding, InvitationCategory.anniversary},
   ),
   InvitationTemplate(
     'terracotta',
@@ -390,11 +392,6 @@ const invitationTemplates = [
     '#FFF7EFE7',
     '#FF7A4A32',
     '#FFC87F5A',
-    categories: {
-      InvitationCategory.wedding,
-      InvitationCategory.engagement,
-      InvitationCategory.other,
-    },
   ),
   InvitationTemplate(
     'blush',
@@ -403,11 +400,6 @@ const invitationTemplates = [
     '#FFFDF0F2',
     '#FF8A4A5A',
     '#FFE39AA8',
-    categories: {
-      InvitationCategory.engagement,
-      InvitationCategory.anniversary,
-      InvitationCategory.babyShower,
-    },
   ),
   InvitationTemplate(
     'confetti',
@@ -416,7 +408,6 @@ const invitationTemplates = [
     '#FFFFF8EC',
     '#FF2E3A59',
     '#FFF07A5F',
-    categories: {InvitationCategory.birthday, InvitationCategory.other},
   ),
   InvitationTemplate(
     'littleone',
@@ -425,7 +416,6 @@ const invitationTemplates = [
     '#FFEFF6FB',
     '#FF4A6B86',
     '#FFF2B8C6',
-    categories: {InvitationCategory.babyShower},
   ),
   InvitationTemplate(
     'starlight',
@@ -435,28 +425,122 @@ const invitationTemplates = [
     '#FFF3F1E7',
     '#FFF0C878',
     dark: true,
-    categories: {
-      InvitationCategory.babyShower,
-      InvitationCategory.birthday,
-    },
   ),
 ];
 
-/// Designs to offer on the card step for [category]: the category-specific art
-/// first, then the universal designs. Never empty.
-List<InvitationTemplate> templatesFor(InvitationCategory category) => [
-  ...invitationTemplates.where(
-    (t) => t.categories.isNotEmpty && t.suits(category),
-  ),
-  ...invitationTemplates.where((t) => t.categories.isEmpty),
+/// One decorative drawing. The same motif is rendered once per category palette
+/// (see [_categoryPalettes]), so every celebration shows ten distinct designs.
+class _Motif {
+  const _Motif(this.id, this.name, this.caption);
+  final String id;
+  final String name;
+  final String caption;
+}
+
+const _motifs = [
+  _Motif('botanical', 'Botanical', 'organic foliage'),
+  _Motif('celestial', 'Celestial', 'night-sky arcs'),
+  _Motif('petals', 'Petals', 'soft blossom'),
+  _Motif('foilframe', 'Foil frame', 'gilded border'),
+  _Motif('arches', 'Arches', 'warm horizon'),
+  _Motif('confetti', 'Confetti', 'playful sprinkle'),
+  _Motif('clouds', 'Clouds', 'sweet dreams'),
+  _Motif('constellation', 'Constellation', 'starlit'),
+  _Motif('laurel', 'Laurel', 'classic wreath'),
+  _Motif('sunburst', 'Sunburst', 'radiant rays'),
 ];
+
+/// Paper, ink and accent for one celebration, mirroring the art generator's
+/// `CATEGORY_PALETTES`.
+class _Palette {
+  const _Palette(this.paper, this.ink, this.accent, {this.dark = false});
+  final String paper;
+  final String ink;
+  final String accent;
+  final bool dark;
+}
+
+const _categoryPalettes = <InvitationCategory, _Palette>{
+  InvitationCategory.wedding: _Palette(
+    '#FFF7F2E9',
+    '#FF3B4A38',
+    '#FF8A7A4E',
+  ),
+  InvitationCategory.engagement: _Palette(
+    '#FFFCF1F1',
+    '#FF6E3F4C',
+    '#FFC08A93',
+  ),
+  InvitationCategory.birthday: _Palette(
+    '#FFFFF8EC',
+    '#FF2E3A59',
+    '#FFF07A5F',
+  ),
+  InvitationCategory.anniversary: _Palette(
+    '#FF0F2A26',
+    '#FFF6EFDC',
+    '#FFC8A24B',
+    dark: true,
+  ),
+  InvitationCategory.babyShower: _Palette(
+    '#FFEFF6FB',
+    '#FF4A6B86',
+    '#FFF2B8C6',
+  ),
+  InvitationCategory.other: _Palette(
+    '#FFF7EFE7',
+    '#FF7A4A32',
+    '#FFC87F5A',
+  ),
+};
+
+InvitationTemplate _design(_Motif motif, InvitationCategory category) {
+  final palette = _categoryPalettes[category]!;
+  return InvitationTemplate(
+    '${motif.id}_${category.wireName}',
+    motif.name,
+    '${category.label} · ${motif.caption}',
+    palette.paper,
+    palette.ink,
+    palette.accent,
+    dark: palette.dark,
+    categories: {category},
+  );
+}
+
+/// 10 motifs x 6 categories = 60 designs, ten per celebration.
+final _categoryDesigns = <InvitationTemplate>[
+  for (final category in InvitationCategory.values)
+    for (final motif in _motifs) _design(motif, category),
+];
+
+/// Every design the app can render: the legacy set (for drafts) plus the
+/// sixty per-category designs. The importer allowlist and image provider are
+/// both derived from this list.
+final invitationTemplates = <InvitationTemplate>[
+  ..._legacyTemplates,
+  ..._categoryDesigns,
+];
+
+/// Exactly ten designs for [category], ordered by motif. Falls back to the
+/// legacy set only if a category somehow has no art.
+List<InvitationTemplate> templatesFor(InvitationCategory category) {
+  final designs = invitationTemplates
+      .where((t) => t.categories.contains(category))
+      .toList();
+  return designs.isEmpty ? _legacyTemplates.take(10).toList() : designs;
+}
 
 InvitationTemplate templateFor(DesignDocument doc) {
-  final bg = doc.nodes.whereType<BackgroundNode>().firstOrNull;
-  return invitationTemplates.firstWhere(
-    (t) => bg?.assetId?.contains('/${t.id}_') ?? false,
-    orElse: () => invitationTemplates.first,
-  );
+  final asset = doc.nodes.whereType<BackgroundNode>().firstOrNull?.assetId;
+  if (asset != null) {
+    for (final template in invitationTemplates) {
+      for (final format in InvitationFormat.values) {
+        if (template.art(format) == asset) return template;
+      }
+    }
+  }
+  return invitationTemplates.first;
 }
 
 InvitationFormat formatFor(DesignDocument doc) =>

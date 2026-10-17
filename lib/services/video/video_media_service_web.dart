@@ -3,8 +3,10 @@ import 'dart:js_interop';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:web/web.dart' as web;
 
+import '../../domain/category_music.dart';
 import 'video_media.dart';
 
 /// Browser default.
@@ -54,6 +56,7 @@ class _WebAudio {
 class WebVideoMediaService implements VideoMediaService {
   static final Map<String, _WebClip> _clips = <String, _WebClip>{};
   static final Map<String, _WebAudio> _audio = <String, _WebAudio>{};
+  static final Map<String, _WebAudio> _bundled = <String, _WebAudio>{};
 
   bool _cancelled = false;
 
@@ -247,6 +250,32 @@ class WebVideoMediaService implements VideoMediaService {
       assetId: assetId,
       title: fileName,
       durationMs: durationMs,
+      url: stored.ensureUrl(),
+    );
+  }
+
+  @override
+  Future<ImportedAudio?> loadBundledTune({
+    required String projectId,
+    required String assetId,
+    String? title,
+    int durationMs = 0,
+  }) async {
+    var stored = _bundled[assetId];
+    if (stored == null) {
+      final data = await rootBundle.load('${CategoryMusic.folder}/$assetId.wav');
+      stored = _WebAudio(
+        title: title ?? assetId,
+        durationMs: durationMs,
+        mimeType: 'audio/wav',
+        bytes: data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+      _bundled[assetId] = stored;
+    }
+    return ImportedAudio(
+      assetId: assetId,
+      title: title ?? stored.title,
+      durationMs: durationMs > 0 ? durationMs : stored.durationMs,
       url: stored.ensureUrl(),
     );
   }

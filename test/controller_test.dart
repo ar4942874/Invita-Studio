@@ -93,6 +93,46 @@ void main() {
     await studio.flush();
     expect(studio.document, before);
   });
+  test('growing a field re-stacks the wording without overlap', () async {
+    studio.selectLayer('first');
+    await Future<void>.delayed(Duration.zero);
+    final before = studio.document.nodes
+        .whereType<TextNode>()
+        .firstWhere((n) => n.id == 'first');
+    await studio.styleText(fontSize: 200);
+    await studio.flush();
+    final stack = {
+      for (final n in studio.document.nodes.whereType<TextNode>()) n.id: n,
+    };
+    const order = [
+      'header',
+      'first',
+      'amp',
+      'second',
+      'message',
+      'date',
+      'time',
+      'venue',
+      'address',
+      'rsvp',
+    ];
+    var previousBottom = double.negativeInfinity;
+    for (final id in order) {
+      final node = stack[id]!;
+      expect(
+        node.frame.top,
+        greaterThanOrEqualTo(previousBottom - .5),
+        reason: '$id overlaps the field above it',
+      );
+      previousBottom = node.frame.bottom;
+    }
+    expect(stack['first']!.fontSize, 200);
+    expect(stack['first']!.frame.height, greaterThan(before.frame.height));
+    expect(
+      stack['rsvp']!.frame.bottom,
+      lessThanOrEqualTo(studio.document.height + .5),
+    );
+  });
   test('direct canvas changes flow back into fields and persist', () async {
     studio.editor.updateTextContent('venue', 'Moonlit Gardens');
     await Future<void>.delayed(Duration.zero);

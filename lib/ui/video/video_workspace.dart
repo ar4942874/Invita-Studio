@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 import '../../application/studio_controller.dart';
+import '../../domain/category_music.dart';
 import '../../domain/video/timeline.dart';
 import '../../services/video/video_audio_platform.dart';
 import '../../services/video/video_media.dart';
@@ -111,12 +112,19 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
       clip = await _store.loadClip(widget.studio.project.id, clipId);
     }
     if (audioId != null) {
-      audio = await _store.loadAudio(
-        widget.studio.project.id,
-        audioId,
-        title: timeline.audio?.title,
-        durationMs: timeline.audio?.durationMs,
-      );
+      audio = CategoryMusic.isTune(audioId)
+          ? await _store.loadBundledTune(
+              projectId: widget.studio.project.id,
+              assetId: audioId,
+              title: timeline.audio?.title,
+              durationMs: timeline.audio?.durationMs ?? 0,
+            )
+          : await _store.loadAudio(
+              widget.studio.project.id,
+              audioId,
+              title: timeline.audio?.title,
+              durationMs: timeline.audio?.durationMs,
+            );
     }
     if (!mounted) return;
     setState(() {

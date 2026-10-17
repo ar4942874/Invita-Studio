@@ -7,7 +7,8 @@ The app integrates a locally vendored, improved version of the open-source [flut
 ## What works now
 
 - **Live invitation details:** names, date, time, venue, address, RSVP, opening line and invitation message update the real canvas. Canvas text edits and undo/redo update the form, too.
-- **Three original templates:** Botanical vows, After dark and Rosewater. Switching templates preserves words and custom text; it replaces the linked fields’ arrangement and styling and can be undone.
+- **A design catalogue per celebration:** each category (wedding, engagement, birthday, anniversary, baby shower, other) offers ten designs, drawn as ten motifs in that category's palette. Switching designs preserves words and custom text; it replaces the linked fields’ arrangement and styling and can be undone.
+- **Reflow on resize:** enlarging a field re-stacks the linked wording into a single column so it never overlaps the field below or leaves the page.
 - **Three formats:** Classic 1080 × 1512, Story 1080 × 1920, Square 1080 × 1080. Format changes reflow linked fields and retain custom text.
 - **Real canvas editing:** select, drag, resize, rotate, inline edit, add/delete custom text, arrange layers, center/straighten, change font, size, color, weight and alignment.
 - **Undo/redo:** including atomic template/format changes and coalesced font-size slider changes. History is session-local, not serialized in project files.
@@ -15,6 +16,7 @@ The app integrates a locally vendored, improved version of the open-source [flut
 - **Local drafts and portable projects:** debounced autosave, multiple drafts (up to 12), rename, import/export versioned editable JSON, and strict import validation.
 - **Save/share plumbing:** browser Blob downloads; app-documents saving and `share_plus` native file sharing with an iPad share anchor. Native device behavior still needs validation.
 - **Video invitations (Android/iOS):** switch to **Video** to animate the same invitation. Play/pause, scrubbing, timecode, a ruler with per-layer tracks, 5–30 s length, visible windows, and fade / slide / zoom entrances and exits with duration, delay and easing. Import a background clip (trim, fit, loop) and optional music (trim, start offset, volume/mute, fades).
+- **A tune per celebration:** every category ships a short bundled track that is pre-selected when you create the project; volume, fade and trim controls still apply.
 - **Real MP4 export:** frames are rendered offscreen with the same painter as the preview, timestamped by frame index (never by playback time) and streamed one at a time to a native H.264 encoder (`MediaCodec` on Android, `AVAssetWriter` on iOS), with AAC music when enabled. 1080 × 1920 @ 30 fps for Story, 540 × 960 lighter option; Classic and Square keep their aspect ratio. Progress, cancellation, error reporting and partial-file cleanup are implemented. Silent and muted exports explicitly have **no audio track**.
 - **Bundled fonts:** Cormorant Garamond, DM Sans and Noto Naskh Arabic. Basic first-strong direction detection and an Arabic-script fallback are included. No runtime font CDN.
 - **Responsive UI:** desktop workspace, tablet layout and mobile editing sheets. No account, API key or backend is required.
@@ -71,7 +73,7 @@ flutter run -d <device-id>
 6. Choose **Export → Create PNG/JPEG → Download/Save or Share**. Preparing the file before the final action preserves a fresh browser user gesture. Out-of-document text is flagged before image export.
 7. Use **Project options → Export editable project** for a backup. Import with **Open project JSON**. A flattened PNG/JPEG or MP4 is not an editable project.
 
-Video notes: imported clips and music are stored in the app's managed media directory, not inside the project JSON. Project JSON is therefore a layout/word backup — to move a video project to another device, copy `InvitaStudioMedia/<projectId>/` with it. Missing media is reported in the preview and the settings sheet instead of crashing. Music is baked into the MP4 but is not audible in the in-app preview (no audio-playback plugin was added). Web and desktop can preview and edit timing but cannot encode; the dialog says so instead of faking an export.
+Video notes: imported clips and music are stored in the app's managed media directory, not inside the project JSON. Project JSON is therefore a layout/word backup — to move a video project to another device, copy `InvitaStudioMedia/<projectId>/` with it. Missing media is reported in the preview and the settings sheet instead of crashing. Each celebration also ships a bundled tune that is pre-selected when you create the project, so no import is needed. Music is audible in the browser preview (the browser download stays silent) but not in the native in-app preview (no audio-playback plugin was added); native export muxes it into the MP4. Web and desktop can preview and edit timing but cannot encode; the dialog says so instead of faking an export.
 
 Long form values shrink to the existing text area without truncation. After substantially shortening a previously long value, use the size control or Reset layout to grow the text again. Manual edits can still cause visual overlaps; inspect the preview. Reset layout removes custom text and restores the linked layout/styles, but can be undone.
 

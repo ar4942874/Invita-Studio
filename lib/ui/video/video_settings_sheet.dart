@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../application/studio_controller.dart';
+import '../../domain/category_music.dart';
 import '../../domain/video/timeline.dart';
 import '../../services/video/video_media.dart';
 import '../../services/video/video_media_platform.dart';
@@ -77,6 +78,13 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
         : await _service.loadClip(widget.studio.project.id, clipId);
     final audio = audioId == null
         ? null
+        : CategoryMusic.isTune(audioId)
+        ? await _service.loadBundledTune(
+            projectId: widget.studio.project.id,
+            assetId: audioId,
+            title: _timeline.audio?.title,
+            durationMs: _timeline.audio?.durationMs ?? 0,
+          )
         : await _service.loadAudio(
             widget.studio.project.id,
             audioId,

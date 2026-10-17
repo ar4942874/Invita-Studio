@@ -13,7 +13,8 @@ The host is a Flutter application with a `ChangeNotifier` coordinator. No second
 | `lib/main.dart` | Binding, local font/license bootstrap, draft restore, initial artwork warm-up |
 | `lib/app.dart` | Standalone Material app |
 | `lib/invitation_studio.dart` | Public host integration exports |
-| `lib/domain/invitation_template.dart` | Field IDs, category-tagged original template layouts, formats, text fitting, font definitions |
+| `lib/domain/invitation_template.dart` | Field IDs, formats, text fitting, font definitions and the design catalogue (10 motifs × 6 category palettes = 60 designs, plus 9 legacy layouts) |
+| `lib/domain/category_music.dart` | The bundled tune each celebration starts with, as a `VideoAudio` with the `tune_` asset prefix |
 | `lib/domain/project.dart` | Versioned project envelope (schema 2), v1 migration, guarded JSON import, effective video view |
 | `lib/domain/video/timeline.dart` | Flutter-free video model: duration, background clip, layer windows/effects, music, deterministic evaluation |
 | `lib/services/video/frame_renderer.dart` | Shared preview/export painter, clipped background-frame LRU, export frame feed |
@@ -32,8 +33,9 @@ The host is a Flutter application with a `ChangeNotifier` coordinator. No second
 | `lib/ui/` | Responsive Flutter workspace, panels, paper, thumbnail previews and export dialog |
 | `lib/ui/home_screen.dart` | Landing wizard: pick a celebration category, enter the details, choose a card, then open the editor |
 | `packages/flutter_canvas_editor/` | Improved vendored editor; exact Dart diff in `tool/vendor_patch.diff` |
-| `assets/` | Nine original 2× backgrounds, thumbnails and licensed local font files |
+| `assets/` | 9 legacy and 60 category 2× backgrounds, thumbnails, 6 synthesized category tunes and licensed local font files |
 | `test/` | Host, document, export and responsive/gesture regression tests |
+| `tool/generate_art.py`, `tool/generate_category_art.py`, `tool/generate_music.py` | Deterministic PIL backgrounds and numpy tunes (no external assets) |
 | `tool/browser/` | Real-browser workflow checks against the compiled Flutter app |
 
 ## Canonical state and ordering
@@ -63,6 +65,14 @@ The whole UI is themed from the OpenDesign **`premium`** design system (open-des
 The palette is a warm-white canvas (`#FAF8F4`) with a graphite ink ramp and a muted bronze accent (`#A06A3B`) as the single signal colour; status uses the package's success/warn/danger tokens rather than ad-hoc hex values. Widgets consume the tokens instead of hard-coding colours.
 
 The package names the commercial typefaces *Canela* (display) and *Inter* (body). Because neither is redistributable, the app substitutes the bundled OFL families **Cormorant Garamond** and **DM Sans**, which share the same display/body roles and keep the build offline and portable.
+
+## Category catalogue, music and reflow
+
+The card step offers ten designs per celebration. A design is a *motif* drawn in a *category palette*: ten hand-written motifs (botanical, celestial, petals, foil frame, arches, confetti, clouds, constellation, laurel, sunburst) are rendered once per celebration palette by `tool/generate_category_art.py`, producing sixty 2× backgrounds and their thumbnails. Because a design carries no template-specific layout, all sixty share the same linked text slots; the nine original designs remain in the catalogue only so older drafts still resolve and export, and `templateFor` matches the exact background asset rather than a name prefix.
+
+Each celebration also ships a short synthesized tune (`tool/generate_music.py`, 16 kHz mono WAV) at `assets/music/tune_<category>.wav`. `CategoryMusic` turns the category into a normal `VideoAudio` whose asset ID carries the `tune_` prefix; the media services resolve that prefix from the app bundle instead of managed storage (`loadBundledTune`), so the tune needs no import step. Creating a project pre-selects it. On the web it plays through the preview player while the browser export stays silent; on native the bytes are copied into the project's audio folder and muxed into the MP4.
+
+Text stays legible when a field is enlarged: `StudioController._reflowStack` re-stacks the linked wording into a single vertical column, keeping each field's horizontal placement while pushing siblings down, then shifting the column up and compressing gaps until it fits inside the page margins. The font-size slider drives it, so increasing one field never overlaps the next.
 
 ## Export path
 

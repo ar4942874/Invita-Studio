@@ -457,6 +457,18 @@ abstract class VideoMediaService {
     required String assetId,
   });
 
+  /// Resolves a bundled category tune (asset ID prefixed `tune_`, see
+  /// `CategoryMusic`) straight from the app bundle, with no import step.
+  ///
+  /// The browser returns an object URL for preview playback; native copies the
+  /// bytes into the project's managed audio folder so the exporter can mux it.
+  Future<ImportedAudio?> loadBundledTune({
+    required String projectId,
+    required String assetId,
+    String? title,
+    int durationMs = 0,
+  });
+
   Future<void> deleteAudio(ImportedAudio audio);
 }
 

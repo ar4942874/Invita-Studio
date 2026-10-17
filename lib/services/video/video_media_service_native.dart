@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart' show rootBundle;
+
+import '../../domain/category_music.dart';
 import 'video_media.dart';
 
 /// Native default: platform codecs probe and extract the clip, and the managed
@@ -111,6 +114,32 @@ class NativeVideoMediaService implements VideoMediaService {
     return ImportedAudio(
       assetId: assetId,
       title: fileName,
+      durationMs: durationMs,
+      path: path,
+    );
+  }
+
+  @override
+  Future<ImportedAudio?> loadBundledTune({
+    required String projectId,
+    required String assetId,
+    String? title,
+    int durationMs = 0,
+  }) async {
+    final path = await _store.audioPath(projectId, assetId, 'wav');
+    final file = File(path);
+    if (!await file.exists()) {
+      final data = await rootBundle.load(
+        '${CategoryMusic.folder}/$assetId.wav',
+      );
+      await file.writeAsBytes(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+        flush: true,
+      );
+    }
+    return ImportedAudio(
+      assetId: assetId,
+      title: title ?? assetId,
       durationMs: durationMs,
       path: path,
     );

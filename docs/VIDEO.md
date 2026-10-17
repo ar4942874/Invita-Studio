@@ -194,6 +194,13 @@ swapped behind conditional imports:
   the download has no audio track. Native builds use a no-op player
   (`video_audio_player_native.dart`) because the encoder muxes the music instead;
   desktop disables music import.
+* **Bundled category tunes** — `lib/domain/category_music.dart` names one WAV per
+  celebration (`assets/music/tune_<category>.wav`, asset IDs prefixed `tune_`).
+  `loadBundledTune` resolves those IDs straight from the app bundle instead of
+  managed storage: the web hands back a blob object URL for the preview player,
+  and native copies the bytes into the project's audio folder so the encoder can
+  mux them. Creating a project pre-selects the matching tune, so music is present
+  without an import step.
 
 `ImportedClip.readFrame` abstracts the frame source: native reads JPEG files
 from the managed directory, the browser returns in-memory PNG bytes.
@@ -211,7 +218,7 @@ from the managed directory, the browser returns in-memory PNG bytes.
 | Project JSON round-trip / v1 migration / validation tests | `test/video_project_test.dart` — pass on Flutter 3.47.7 / Dart 3.13.5 |
 | Timeline evaluation, easing, frame-index tests | `test/video_timeline_test.dart` — pass |
 | Media/manifest/frame-mapping/progress tests | `test/video_media_test.dart` — pass |
-| Full suite (89 tests), web export/import/music wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
+| Full suite (300 tests), web export/import/music wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
 
 ### Not executed (blockers)
 

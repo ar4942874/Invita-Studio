@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:invitation_studio/domain/category_music.dart';
 import 'package:invitation_studio/domain/invitation_template.dart';
 import 'package:invitation_studio/domain/project.dart';
 import 'package:invitation_studio/services/bundled_fonts.dart'
@@ -53,25 +54,33 @@ void main() {
       expect(thumb.lengthInBytes, greaterThan(0));
     }
   });
+  test('every category ships a bundled tune', () async {
+    for (final category in InvitationCategory.values) {
+      final audio = CategoryMusic.forCategory(category);
+      expect(audio.assetId, CategoryMusic.tuneId(category));
+      expect(CategoryMusic.isTune(audio.assetId), isTrue);
+      expect(audio.durationMs, greaterThan(0));
+      final bytes = await rootBundle.load(CategoryMusic.assetPath(category));
+      // A RIFF/WAVE header plus at least some samples.
+      expect(bytes.lengthInBytes, greaterThan(1000));
+    }
+  });
   group('category designs', () {
-    test('every category offers art and tagged designs sort ahead', () {
+    test('every category offers exactly ten of its own designs', () {
       for (final category in InvitationCategory.values) {
         final designs = templatesFor(category);
-        expect(designs, isNotEmpty);
-        expect(designs.first.suits(category), isTrue);
-        final firstUniversal = designs.indexWhere((t) => t.categories.isEmpty);
-        final lastTagged = designs.lastIndexWhere(
-          (t) => t.categories.isNotEmpty,
-        );
-        if (firstUniversal != -1 && lastTagged != -1) {
-          expect(lastTagged, lessThan(firstUniversal));
+        expect(designs.length, 10);
+        for (final design in designs) {
+          expect(design.categories, {category});
+          expect(design.suits(category), isTrue);
         }
+        expect(designs.map((t) => t.id).toSet().length, 10);
       }
     });
-    test('a birthday leads with playful art yet keeps the favourites', () {
+    test('a birthday leads with playful art in the birthday palette', () {
       final ids = templatesFor(InvitationCategory.birthday).map((t) => t.id);
-      expect(ids, contains('confetti'));
-      expect(ids, contains('botanical'));
+      expect(ids, contains('confetti_birthday'));
+      expect(ids, contains('botanical_birthday'));
     });
   });
   test('long names retain the full value and fit the frame', () {
