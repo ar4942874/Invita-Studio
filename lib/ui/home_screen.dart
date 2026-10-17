@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../application/studio_controller.dart';
 import '../domain/invitation_template.dart';
 import '../domain/project.dart';
+import '../l10n/app_localizations.dart';
 import 'studio_screen.dart';
 import 'studio_theme.dart';
 import 'widgets/controls.dart';
@@ -24,14 +25,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _stepTitles = ['Choose a category', 'Your details', 'Pick a card'];
-
   int _step = 0;
   InvitationCategory? _category;
   InvitationTemplate _template = invitationTemplates.first;
   final Map<String, String> _values = {};
 
   StudioController get _studio => widget.studio;
+
+  AppLocalizations get _l10n => AppLocalizations.of(context);
+
+  String get _stepTitle => switch (_step) {
+    0 => _l10n.stepChooseCategory,
+    1 => _l10n.stepYourDetails,
+    _ => _l10n.stepPickCard,
+  };
 
   @override
   void dispose() {
@@ -142,15 +149,15 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         if (_step > 0)
           IconButton(
-            tooltip: 'Back',
+            tooltip: _l10n.back,
             onPressed: _back,
             icon: const Icon(Icons.arrow_back, size: 20),
           ),
         const BrandMark(size: 33),
         const SizedBox(width: 10),
-        const Text(
-          'invita',
-          style: TextStyle(
+        Text(
+          _l10n.brandName,
+          style: const TextStyle(
             fontFamily: 'CormorantGaramond',
             fontSize: 30,
             height: 1,
@@ -159,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const Spacer(),
-        TinyLabel(_stepTitles[_step]),
+        TinyLabel(_stepTitle),
       ],
     ),
   );
@@ -187,8 +194,8 @@ class _HomeScreenState extends State<HomeScreen> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _heading(
-        'What are we celebrating?',
-        'Pick a category to shape the wording. You can change everything later.',
+        _l10n.homeCelebrateTitle,
+        _l10n.homeCelebrateSubtitle,
       ),
       _continueCard(),
       const SizedBox(height: 26),
@@ -246,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Continue “${latest.title}”',
+                  _l10n.continueDraft(latest.title),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -257,13 +264,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               FilledButton(
                 onPressed: _continueEditing,
-                child: const Text('Continue editing'),
+                child: Text(_l10n.continueEditing),
               ),
             ],
           ),
           if (drafts.length > 1) ...[
             const SizedBox(height: 12),
-            const TinyLabel('Recent invitations'),
+            TinyLabel(_l10n.recentInvitations),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -291,8 +298,8 @@ class _HomeScreenState extends State<HomeScreen> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _heading(
-        _category?.label ?? 'Your details',
-        'These fill your invitation. Long text scales down to fit — nothing is cut off.',
+        _category?.label ?? _l10n.stepYourDetails,
+        _l10n.homeDetailsSubtitle,
       ),
       LayoutBuilder(
         builder: (context, constraints) {
@@ -323,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       const SizedBox(height: 30),
       _footer(
-        primaryLabel: 'Choose a card',
+        primaryLabel: _l10n.chooseACard,
         onPrimary: () {
           FocusScope.of(context).unfocus();
           setState(() => _step = 2);
@@ -337,11 +344,12 @@ class _HomeScreenState extends State<HomeScreen> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _heading(
-        'Choose a card',
+        _l10n.chooseACard,
         _category == null
-            ? 'Every design keeps your words. You can switch or restyle at any time.'
-            : 'Designs for a ${_category!.label.toLowerCase()}, plus our timeless '
-                  'favourites. Every design keeps your words.',
+            ? _l10n.homeCardSubtitle
+            : _l10n.homeCardSubtitleForCategory(
+                _category!.label.toLowerCase(),
+              ),
       ),
       LayoutBuilder(
         builder: (context, constraints) {
@@ -370,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       const SizedBox(height: 30),
       _footer(
-        primaryLabel: 'Create invitation',
+        primaryLabel: _l10n.createInvitation,
         onPrimary: _create,
       ),
     ],
@@ -381,7 +389,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback onPrimary,
   }) => Row(
     children: [
-      OutlinedButton(onPressed: _back, child: const Text('Back')),
+      OutlinedButton(onPressed: _back, child: Text(_l10n.back)),
       const Spacer(),
       FilledButton.icon(
         onPressed: onPrimary,

@@ -1,0 +1,34 @@
+{
+  "@@locale": "en",
+  "brandName": "invita",
+  "back": "Back",
+  "stepChooseCategory": "Choose a category",
+  "stepYourDetails": "Your details",
+  "stepPickCard": "Pick a card",
+  "homeCelebrateTitle": "What are we celebrating?",
+  "homeCelebrateSubtitle": "Pick a category to shape the wording. You can change everything later.",
+  "homeDetailsSubtitle": "These fill your invitation. Long text scales down to fit — nothing is cut off.",
+  "homeCardSubtitle": "Every design keeps your words. You can switch or restyle at any time.",
+  "homeCardSubtitleForCategory": "Designs for a {category}, plus our timeless favourites. Every design keeps your words.",
+  "@homeCardSubtitleForCategory": {
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "continueDraft": "Continue “{title}”",
+  "@continueDraft": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "continueEditing": "Continue editing",
+  "recentInvitations": "Recent invitations",
+  "chooseACard": "Choose a card",
+  "createInvitation": "Create invitation",
+  "language": "Language",
+  "languageSystem": "System default"
+}

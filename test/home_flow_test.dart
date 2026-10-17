@@ -4,6 +4,7 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'package:invitation_studio/application/studio_controller.dart';
 import 'package:invitation_studio/domain/invitation_template.dart';
 import 'package:invitation_studio/domain/project.dart';
+import 'package:invitation_studio/l10n/app_localizations.dart';
 import 'package:invitation_studio/services/bundled_fonts.dart'
     show loadStudioFonts;
 import 'package:invitation_studio/services/draft_store.dart';
@@ -53,7 +54,12 @@ void main() {
     addTearDown(studio.dispose);
 
     await tester.pumpWidget(
-      MaterialApp(theme: studioTheme(), home: HomeScreen(studio: studio)),
+      MaterialApp(
+        theme: studioTheme(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HomeScreen(studio: studio),
+      ),
     );
     await tester.pumpAndSettle();
 

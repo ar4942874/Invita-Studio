@@ -6,8 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../application/app_settings.dart';
 import '../application/studio_controller.dart';
 import '../domain/project.dart';
+import '../l10n/app_localizations.dart';
 import '../services/file_actions.dart';
 import 'studio_theme.dart';
 import 'widgets/artboard.dart';
@@ -292,6 +294,48 @@ class _StudioScreenState extends State<StudioScreen>
       ],
     );
   }
+
+  Future<void> _chooseLanguage() async {
+    final settings = AppSettingsScope.maybeOf(context);
+    if (settings == null) return;
+    final l10n = AppLocalizations.of(context);
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(l10n.language),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop('system'),
+            child: Row(
+              children: [
+                Expanded(child: Text(l10n.languageSystem)),
+                if (settings.locale == null) const Icon(Icons.check, size: 18),
+              ],
+            ),
+          ),
+          for (final locale in AppLocalizations.supportedLocales)
+            SimpleDialogOption(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(locale.languageCode),
+              child: Row(
+                children: [
+                  Expanded(child: Text(_languageName(locale.languageCode))),
+                  if (settings.locale?.languageCode == locale.languageCode)
+                    const Icon(Icons.check, size: 18),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    await settings.setLocale(
+      choice == 'system' ? null : Locale(choice),
+    );
+  }
+
+  static String _languageName(String code) =>
+      switch (code) { 'en' => 'English', 'es' => 'Español', _ => code };
 
   void _drafts() {
     FocusScope.of(context).unfocus();
@@ -590,28 +634,41 @@ class _StudioScreenState extends State<StudioScreen>
                   _backup();
                 case 'rename':
                   _rename();
+                case 'language':
+                  _chooseLanguage();
                 case 'about':
                   _about();
                 case 'reset':
                   _reset();
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'home', child: Text('Go to home')),
-              PopupMenuItem(value: 'drafts', child: Text('My drafts')),
-              PopupMenuItem(value: 'import', child: Text('Open project JSON')),
-              PopupMenuItem(
-                value: 'backup',
-                child: Text('Export editable project'),
-              ),
-              PopupMenuItem(value: 'rename', child: Text('Rename invitation')),
-              PopupMenuItem(value: 'reset', child: Text('Reset layout')),
-              PopupMenuDivider(),
-              PopupMenuItem(
-                value: 'about',
-                child: Text('About & open-source licenses'),
-              ),
-            ],
+            itemBuilder: (menuContext) {
+              final l10n = AppLocalizations.of(menuContext);
+              return [
+                const PopupMenuItem(value: 'home', child: Text('Go to home')),
+                const PopupMenuItem(value: 'drafts', child: Text('My drafts')),
+                const PopupMenuItem(
+                  value: 'import',
+                  child: Text('Open project JSON'),
+                ),
+                const PopupMenuItem(
+                  value: 'backup',
+                  child: Text('Export editable project'),
+                ),
+                const PopupMenuItem(
+                  value: 'rename',
+                  child: Text('Rename invitation'),
+                ),
+                const PopupMenuItem(value: 'reset', child: Text('Reset layout')),
+                const PopupMenuDivider(),
+                PopupMenuItem(value: 'language', child: Text(l10n.language)),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'about',
+                  child: Text('About & open-source licenses'),
+                ),
+              ];
+            },
           ),
           SizedBox(width: mobile ? 4 : 12),
           FilledButton.icon(

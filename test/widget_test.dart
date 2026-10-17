@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:invitation_studio/app.dart';
+import 'package:invitation_studio/application/app_settings.dart';
 import 'package:invitation_studio/application/studio_controller.dart';
 import 'package:invitation_studio/domain/project.dart';
 import 'package:invitation_studio/domain/video/timeline.dart';
 import 'package:invitation_studio/services/bundled_fonts.dart'
     show loadStudioFonts;
 import 'package:invitation_studio/services/draft_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -207,6 +209,35 @@ void main() {
     semantics.dispose();
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+  });
+  testWidgets('language switch localizes the shell', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final studio = StudioController(
+      project: StudioProject.sample(),
+      store: MemoryProjectStore(),
+    );
+    addTearDown(studio.dispose);
+    await tester.pumpWidget(
+      StudioApp(controller: studio, settings: AppSettings()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Project options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Language'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Español'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Project options'));
+    await tester.pumpAndSettle();
+    expect(find.text('Idioma'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
   });
