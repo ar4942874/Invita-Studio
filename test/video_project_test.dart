@@ -134,4 +134,23 @@ void main() {
     expect(base.layerIds.contains('header'), isTrue);
     expect(base.layerIds.contains('background'), isFalse);
   });
+
+  test('category round-trips and defaults to wedding when missing', () {
+    final project = _project().copyWith(
+      category: InvitationCategory.birthday,
+    );
+    expect(project.encode(), contains('"category": "birthday"'));
+    expect(
+      StudioProject.decode(project.encode()).category,
+      InvitationCategory.birthday,
+    );
+
+    // A file saved before categories existed has no key.
+    final json = jsonDecode(project.encode()) as Map<String, dynamic>;
+    json.remove('category');
+    expect(
+      StudioProject.decode(jsonEncode(json)).category,
+      InvitationCategory.wedding,
+    );
+  });
 }

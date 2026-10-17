@@ -490,6 +490,31 @@ class StudioController extends ChangeNotifier {
   }
 
   Future<void> newProject() => openProject(StudioProject.sample());
+
+  /// Creates a fresh invitation from the home-screen wizard and opens it.
+  ///
+  /// [fields] are the details the user typed; missing values fall back to the
+  /// template defaults.
+  Future<void> createProject({
+    required InvitationCategory category,
+    required InvitationTemplate template,
+    required Map<String, String> fields,
+    InvitationFormat format = InvitationFormat.classic,
+  }) async {
+    final id = 'p_${DateTime.now().microsecondsSinceEpoch}';
+    final project = StudioProject(
+      id: id,
+      title: category.titleFor(fields),
+      updatedAt: DateTime.now(),
+      category: category,
+      document: template.createDocument(
+        documentId: id,
+        format: format,
+        fields: fields,
+      ),
+    );
+    await openProject(project);
+  }
   void _upsert(StudioProject value) {
     _drafts = [
       value,

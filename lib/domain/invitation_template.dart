@@ -61,6 +61,111 @@ const invitationFields = [
   ),
 ];
 
+/// The kind of celebration, chosen on the home screen.
+///
+/// A category seeds the wording and the project title. It does not change the
+/// bundled artwork: the same three designs are offered for every category until
+/// category-specific art is added.
+enum InvitationCategory {
+  wedding(
+    'wedding',
+    'Wedding',
+    'Celebrate the two of you',
+    Icons.favorite_outline,
+    {},
+  ),
+  engagement(
+    'engagement',
+    'Engagement',
+    'Announce your promise',
+    Icons.diamond_outlined,
+    {
+      'header': 'WITH FAMILIES & FRIENDS',
+      'message': 'invite you to celebrate their engagement',
+    },
+  ),
+  birthday(
+    'birthday',
+    'Birthday',
+    'Mark another year',
+    Icons.cake_outlined,
+    {
+      'header': 'PLEASE JOIN US TO CELEBRATE',
+      'message': 'join us to celebrate a birthday',
+    },
+  ),
+  anniversary(
+    'anniversary',
+    'Anniversary',
+    'Honour the years together',
+    Icons.auto_awesome_outlined,
+    {
+      'header': 'TOGETHER WITH THEIR FAMILIES',
+      'message': 'invite you to celebrate their anniversary',
+    },
+  ),
+  babyShower(
+    'babyShower',
+    'Baby shower',
+    'Welcome a little one',
+    Icons.child_care_outlined,
+    {
+      'header': 'A LITTLE ONE IS ON THE WAY',
+      'message': 'please join us to welcome their little one',
+    },
+  ),
+  other(
+    'other',
+    'Something else',
+    'Any occasion you like',
+    Icons.celebration_outlined,
+    {
+      'header': 'YOU ARE INVITED',
+      'message': 'please join us to celebrate',
+    },
+  );
+
+  const InvitationCategory(
+    this.wireName,
+    this.label,
+    this.tagline,
+    this.icon,
+    this.defaults,
+  );
+
+  final String wireName;
+  final String label;
+  final String tagline;
+  final IconData icon;
+
+  /// Wording that replaces the shared field initials for this category.
+  final Map<String, String> defaults;
+
+  static InvitationCategory? fromWire(String? value) {
+    for (final category in InvitationCategory.values) {
+      if (category.wireName == value) return category;
+    }
+    return null;
+  }
+
+  /// The initial details-form values: the shared field defaults with this
+  /// category's wording layered on top.
+  Map<String, String> seedFields() => {
+    for (final field in invitationFields) field.id: field.initial,
+    ...defaults,
+  };
+
+  /// A friendly default project title from the entered names.
+  String titleFor(Map<String, String> fields) {
+    final first = (fields['first'] ?? '').trim();
+    final second = (fields['second'] ?? '').trim();
+    if (first.isNotEmpty && second.isNotEmpty) return '$first & $second';
+    if (first.isNotEmpty) return first;
+    if (second.isNotEmpty) return second;
+    return label;
+  }
+}
+
 const boundIds = {
   'first',
   'second',

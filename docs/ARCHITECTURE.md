@@ -30,6 +30,7 @@ The host is a Flutter application with a `ChangeNotifier` coordinator. No second
 | `lib/services/jpeg_encoder_*.dart` | Conditional native/VM isolate encoding vs browser-native JPEG encoding |
 | `lib/services/file_actions_*.dart` | Conditional app-documents/file-save vs Blob-download implementations |
 | `lib/ui/` | Responsive Flutter workspace, panels, paper, thumbnail previews and export dialog |
+| `lib/ui/home_screen.dart` | Landing wizard: pick a celebration category, enter the details, choose a card, then open the editor |
 | `packages/flutter_canvas_editor/` | Improved vendored editor; exact Dart diff in `tool/vendor_patch.diff` |
 | `assets/` | Nine original 2× backgrounds, thumbnails and licensed local font files |
 | `test/` | Host, document, export and responsive/gesture regression tests |
@@ -70,7 +71,7 @@ The result is independent of physical screen dimensions and viewport zoom. This 
 
 ## Persistence and import security
 
-`invita.project` version 1 stores project ID, title, UTC modification time and document JSON. Each project is independent of its flattened exports. Local preferences store at most 12 projects; opening a new one at capacity is blocked instead of silently dropping an old one.
+`invita.project` version 1 stores project ID, title, UTC modification time and document JSON. Schema 2 adds the video timeline and, additively, a celebration `category` (older files without the key load as `wedding`). Each project is independent of its flattened exports. Local preferences store at most 12 projects; opening a new one at capacity is blocked instead of silently dropping an old one.
 
 Autosave is debounced by 650 ms and storage writes are serialized. Save-state revisions prevent an older write from falsely marking a newer pending edit saved. A write failure is visible and prompts a JSON backup. Lifecycle save attempts are best effort; a browser shutdown is not a transactional database commit.
 

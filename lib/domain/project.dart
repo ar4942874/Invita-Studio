@@ -23,11 +23,16 @@ class StudioProject {
     required this.updatedAt,
     required this.document,
     this.video = VideoTimeline.defaults,
+    this.category = InvitationCategory.wedding,
   });
   final String id, title;
   final DateTime updatedAt;
   final DesignDocument document;
   final VideoTimeline video;
+
+  /// The celebration chosen on the home screen. Additive to schema 2: older
+  /// files without the key load as [InvitationCategory.wedding].
+  final InvitationCategory category;
 
   /// IDs of the layers that can be animated (the background is not a layer).
   Set<String> get layerIds => {
@@ -74,12 +79,14 @@ class StudioProject {
     DesignDocument? document,
     DateTime? updatedAt,
     VideoTimeline? video,
+    InvitationCategory? category,
   }) => StudioProject(
     id: id,
     title: title ?? this.title,
     updatedAt: updatedAt ?? DateTime.now(),
     document: document ?? this.document,
     video: video ?? this.video,
+    category: category ?? this.category,
   );
 
   Map<String, dynamic> toJson() => {
@@ -87,6 +94,7 @@ class StudioProject {
     'version': schemaVersion,
     'id': id,
     'title': title,
+    'category': category.wireName,
     'updatedAt': updatedAt.toUtc().toIso8601String(),
     'document': document.toJson(),
     'video': video.toJson(),
@@ -267,6 +275,9 @@ class StudioProject {
             DateTime.now(),
         document: document,
         video: video,
+        category:
+            InvitationCategory.fromWire(json['category'] as String?) ??
+            InvitationCategory.wedding,
       );
       final problems = project.effectiveVideo.validate(
         layerIds: project.layerIds,

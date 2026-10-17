@@ -4,6 +4,7 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'app.dart';
 import 'application/studio_controller.dart';
 import 'services/bundled_fonts.dart';
+import 'ui/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,5 +19,5 @@ Future<void> main() async {
   for (final image in images.values) {
     image.dispose();
   }
-  runApp(StudioApp(controller: studio));
+  runApp(StudioApp(controller: studio, home: HomeScreen(studio: studio)));
 }

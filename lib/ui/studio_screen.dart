@@ -580,6 +580,8 @@ class _StudioScreenState extends State<StudioScreen>
             icon: const Icon(Icons.more_horiz, size: 21),
             onSelected: (value) {
               switch (value) {
+                case 'home':
+                  Navigator.of(context).maybePop();
                 case 'drafts':
                   _drafts();
                 case 'import':
@@ -595,6 +597,7 @@ class _StudioScreenState extends State<StudioScreen>
               }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(value: 'home', child: Text('Go to home')),
               PopupMenuItem(value: 'drafts', child: Text('My drafts')),
               PopupMenuItem(value: 'import', child: Text('Open project JSON')),
               PopupMenuItem(
