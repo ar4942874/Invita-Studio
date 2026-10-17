@@ -11,7 +11,7 @@ the build environment, and what still requires real devices.
 | Shared content | Image and video modes edit **one** `StudioController` / `DesignDocument`. Wording, fonts, colours and layer positions are the same objects; switching modes never copies or re-flows the document. |
 | Timeline model | `lib/domain/video/timeline.dart`: versioned `VideoTimeline` with duration (5–30 s), fixed 30 fps, background clip settings, per-layer `LayerMotion` (visible window, entrance, exit), and one optional music track. |
 | Animation | `fade`, `slideUp/Down/Left/Right`, `zoomIn/zoomOut` with duration 100–3000 ms, delay, and four easings. `evaluateTimeline` is the single evaluator used by both preview and export. |
-| Card presets | `MotionPreset` in `lib/domain/video/timeline.dart` gives a layman one-tap, whole-card styles — `rise`, `zoomIn`, `zoomOut` and `stagger` (plus `none`). Each writes ordinary per-layer motions, so preview and export need no special case, and `MotionPreset.detect` re-highlights the style a timeline currently matches. |
+| Card presets | `MotionPreset` in `lib/domain/video/timeline.dart` gives a layman one-tap, whole-card styles — `fade`, `rise`, `zoomIn`, `zoomOut`, `pop`, `slide`, `stagger` ("One by one") and `none`. Each writes ordinary per-layer motions, so preview and export need no special case, and `MotionPreset.detect` re-highlights the style a timeline currently matches. `VideoTimeline.settledTimeMs` reports when every entrance has finished so an idle preview shows the settled card instead of a blank first frame. |
 | Preview | Play/pause, scrubbing, timecode, ruler, layer tracks and playhead. The default workspace shows a preset strip so a non-technical user just taps a style; a `Customize` toggle reveals the per-layer inspector for window/effect/duration/easing. Frame painting goes through `TimelineFrameRenderer`. |
 | Export | `VideoExporter` freezes the document + timeline, renders each frame offscreen, and streams raw RGBA to a native encoder through `VideoEncoderBackend`. Frames are never queued in memory. |
 | Native encoders | Android `MediaCodec`/`MediaMuxer` (H.264 + AAC) and iOS `AVAssetWriter` (H.264, audio muxed in a second pass). Both are registered in `MainActivity.kt` / `AppDelegate.swift`. |
@@ -156,7 +156,7 @@ Neither backend is compiled in this environment; see the verification section.
 |---|---|---|---|
 | Android 7+ (minSdk 24) | yes | yes (native, on disk) | yes (native H.264 + AAC MP4) |
 | iOS 15+ | yes | yes (native, on disk) | yes (native H.264 + AAC MP4) |
-| Web | yes | yes — decoded in memory for the session, not persisted | yes — `MediaRecorder` downloads WebM/MP4, always silent |
+| Web | yes (music plays in the preview) | yes — decoded in memory for the session, not persisted | yes — `MediaRecorder` downloads WebM/MP4, always silent |
 | Desktop | yes (artwork, animations, scrubbing) | no | no — dialog explains the encoder is unavailable |
 
 Desktop never pretends to export: `isVideoExportSupported` gates the action and
@@ -179,7 +179,15 @@ swapped behind conditional imports:
   element and extracts downscaled frames (seek + `drawImage` + PNG encode),
   holding them in memory for the session. Reloading the page loses them; the
   draft then reports the clip as missing and the settings sheet offers re-import.
-  Music import is disabled on the web (browser export is silent).
+* **Music import + preview playback** — `video_media_service_web.dart` probes a
+  picked file with an `<audio>` element (for its duration), keeps the bytes in
+  memory and hands back a blob object URL. `video_audio_platform.dart` selects
+  `video_audio_player_web.dart`, which drives an `<audio>` element from the
+  transport and applies the trim start, volume and fade-in/fade-out envelope, so
+  music is **audible in the web preview**. The browser export stays silent, so
+  the download has no audio track. Native builds use a no-op player
+  (`video_audio_player_native.dart`) because the encoder muxes the music instead;
+  desktop disables music import.
 
 `ImportedClip.readFrame` abstracts the frame source: native reads JPEG files
 from the managed directory, the browser returns in-memory PNG bytes.
@@ -197,7 +205,7 @@ from the managed directory, the browser returns in-memory PNG bytes.
 | Project JSON round-trip / v1 migration / validation tests | `test/video_project_test.dart` — pass on Flutter 3.47.7 / Dart 3.13.5 |
 | Timeline evaluation, easing, frame-index tests | `test/video_timeline_test.dart` — pass |
 | Media/manifest/frame-mapping/progress tests | `test/video_media_test.dart` — pass |
-| Full suite (86 tests), web export/import wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
+| Full suite (89 tests), web export/import/music wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
 
 ### Not executed (blockers)
 
@@ -231,9 +239,11 @@ builds or that the native plugins ran.
 
 * One scene, 5–30 s, fixed 30 fps. No multi-scene sequencing, no per-layer
   keyframe tracks beyond one entrance and one exit.
-* Music is **not audible in the in-app preview** (no audio-playback dependency
-  was added); it is baked into the export only, and the transport bar labels it
-  as such.
+* Music plays in the **web** preview through an `<audio>` element (trim start,
+  volume and fades are applied). Native builds have no audio-playback dependency,
+  so there it is baked into the export only and is not audible in the preview;
+  the transport bar labels the native case as such. On the web the music is
+  previewed only — the browser export is silent.
 * Background video is converted to a JPEG proxy sequence at import time (bounded
   to 900 frames), so animation inside the clip is previewed at 30 fps from the
   proxy. Device storage use is shown in the settings sheet. On the web the proxy

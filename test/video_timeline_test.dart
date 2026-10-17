@@ -17,8 +17,14 @@ void main() {
 
     test('easing endpoints and monotonicity', () {
       for (final easing in MotionEasing.values) {
-        expect(easing.apply(0), 0);
-        expect(easing.apply(1), 1);
+        expect(easing.apply(0), closeTo(0, 1e-9));
+        expect(easing.apply(1), closeTo(1, 1e-9));
+        if (easing == MotionEasing.easeOutBack) {
+          // Overshoots past 1 before settling: the spring/pop feel is not
+          // monotonic by design.
+          expect(easing.apply(0.8), greaterThan(1));
+          continue;
+        }
         var previous = -1.0;
         for (var i = 0; i <= 20; i++) {
           final value = easing.apply(i / 20);
@@ -112,7 +118,7 @@ void main() {
       );
     });
 
-    test('zoom entrance scales from 0.9 and exit fades to zero', () {
+    test('zoom entrance scales from 0.82 and exit fades to zero', () {
       const timeline = VideoTimeline(
         durationMs: 5000,
         motions: {
@@ -133,7 +139,7 @@ void main() {
       );
       expect(
         evaluateTimeline(timeline, ids, 0).visualFor('a').scale,
-        closeTo(.9, 1e-9),
+        closeTo(.82, 1e-9),
       );
       expect(
         evaluateTimeline(timeline, ids, 1000).visualFor('a').scale,
@@ -322,6 +328,41 @@ void main() {
       expect(layer.visibleStartMs, 0);
       expect(layer.visibleEndMs, 15000);
       expect(layer.exit.isAnimated, isFalse);
+    });
+
+    test('fade, pop and slide use their signature effects', () {
+      Map<String, MotionEffect> effectsFor(MotionPreset preset) => {
+        for (final entry
+            in preset.build(layerIds: ids, durationMs: 15000).entries)
+          entry.key: entry.value.entrance.effect,
+      };
+      expect(effectsFor(MotionPreset.fade)['first'], MotionEffect.fade);
+      expect(effectsFor(MotionPreset.pop)['first'], MotionEffect.zoomIn);
+      expect(
+        MotionPreset.pop
+            .build(layerIds: ids, durationMs: 15000)['first']!
+            .entrance
+            .easing,
+        MotionEasing.easeOutBack,
+      );
+      final slide = effectsFor(MotionPreset.slide);
+      expect(slide['header'], MotionEffect.slideLeft);
+      expect(slide['first'], MotionEffect.slideRight);
+    });
+
+    test('settledTimeMs reaches past every entrance', () {
+      const timeline = VideoTimeline(durationMs: 15000);
+      expect(timeline.settledTimeMs, 0);
+      final motions = MotionPreset.stagger.build(
+        layerIds: ids,
+        durationMs: 15000,
+      );
+      final staggered = VideoTimeline(durationMs: 15000, motions: motions);
+      final last = motions['second']!;
+      expect(
+        staggered.settledTimeMs,
+        last.entrance.delayMs + last.entrance.durationMs,
+      );
     });
 
     test('stagger delays increase and stay inside the card and delay limit', () {

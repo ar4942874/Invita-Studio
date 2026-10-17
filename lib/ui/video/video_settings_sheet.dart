@@ -199,10 +199,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
 
   Future<void> _importMusic() async {
     if (!_service.isMusicSupported) {
-      _toast(
-        'Music import needs the Android or iOS app. '
-        'Browser exports are silent.',
-      );
+      _toast('Music import is not available on this platform.');
       return;
     }
     final file = await openFile(acceptedTypeGroups: const [audioTypeGroup]);
@@ -455,9 +452,11 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
             const SizedBox(height: 14),
             _section('MUSIC'),
             if (_timeline.audio == null)
-              const Text(
-                'No music. The MP4 will have no audio track.',
-                style: TextStyle(fontSize: 11, color: StudioColors.muted),
+              Text(
+                kIsWeb
+                    ? 'No music. It will play in the preview; the browser export stays silent.'
+                    : 'No music. The MP4 will have no audio track.',
+                style: const TextStyle(fontSize: 11, color: StudioColors.muted),
               )
             else ...[
               if (_audioMissing)
@@ -659,7 +658,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
               kIsWeb
                   ? 'Browser imports are decoded into memory for this session '
                         'only and are not saved, so re-import after a reload. '
-                        'The project JSON stays small.'
+                        'Music plays in the preview; the browser export is silent.'
                   : 'Imported video and music are stored on this device, not '
                         'inside the project JSON. Backups need the media '
                         'relinked on another device.',

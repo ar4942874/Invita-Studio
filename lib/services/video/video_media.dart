@@ -160,13 +160,19 @@ class ImportedAudio {
     required this.assetId,
     required this.title,
     required this.durationMs,
-    required this.path,
+    this.path = '',
+    this.url,
   });
 
   final String assetId;
   final String title;
   final int durationMs;
+
+  /// Absolute native file path. Empty on the web build.
   final String path;
+
+  /// Browser object URL used for preview playback. `null` on native.
+  final String? url;
 }
 
 /// Result of extracting the JPEG proxy sequence.

@@ -24,17 +24,46 @@ class _WebClip {
   int get bytes => frames.fold(0, (sum, frame) => sum + frame.length);
 }
 
+class _WebAudio {
+  _WebAudio({
+    required this.title,
+    required this.durationMs,
+    required this.mimeType,
+    required this.bytes,
+  });
+
+  final String title;
+  final int durationMs;
+  final String mimeType;
+  final Uint8List bytes;
+  String? url;
+
+  String ensureUrl() {
+    final existing = url;
+    if (existing != null) return existing;
+    final blob = web.Blob(
+      [bytes.toJS].toJS,
+      web.BlobPropertyBag(type: mimeType),
+    );
+    final created = web.URL.createObjectURL(blob);
+    url = created;
+    return created;
+  }
+}
+
 class WebVideoMediaService implements VideoMediaService {
   static final Map<String, _WebClip> _clips = <String, _WebClip>{};
+  static final Map<String, _WebAudio> _audio = <String, _WebAudio>{};
 
   bool _cancelled = false;
 
   @override
   bool get isSupported => true;
 
-  /// The browser export is silent, so music import is intentionally disabled.
+  /// Music is imported and played in the preview; the browser export stays
+  /// silent, so the music is not baked into the downloaded video.
   @override
-  bool get isMusicSupported => false;
+  bool get isMusicSupported => true;
 
   static String _key(String projectId, String assetId) => '$projectId/$assetId';
 
@@ -155,7 +184,16 @@ class WebVideoMediaService implements VideoMediaService {
     String assetId, {
     String? title,
     int? durationMs,
-  }) async => null;
+  }) async {
+    final stored = _audio[_key(projectId, assetId)];
+    if (stored == null) return null;
+    return ImportedAudio(
+      assetId: assetId,
+      title: title ?? stored.title,
+      durationMs: durationMs ?? stored.durationMs,
+      url: stored.ensureUrl(),
+    );
+  }
 
   @override
   Future<void> deleteClip(String projectId, String assetId) async {
@@ -168,12 +206,25 @@ class WebVideoMediaService implements VideoMediaService {
     for (final entry in _clips.entries) {
       if (entry.key.startsWith('$projectId/')) total += entry.value.bytes;
     }
+    for (final entry in _audio.entries) {
+      if (entry.key.startsWith('$projectId/')) total += entry.value.bytes.length;
+    }
     return total;
   }
 
   @override
   Future<int> probeAudioDuration(String sourcePath) async {
-    throw const FormatException('Music is not available in the browser build.');
+    final audio = _createAudio(sourcePath);
+    try {
+      await _readyAudio(audio);
+      final ms = (audio.duration * 1000).round();
+      if (ms <= 0) {
+        throw const FormatException('That audio file could not be read.');
+      }
+      return ms;
+    } finally {
+      _releaseAudio(audio);
+    }
   }
 
   @override
@@ -182,10 +233,34 @@ class WebVideoMediaService implements VideoMediaService {
     required String fileName,
     required String projectId,
     required String assetId,
-  }) async => null;
+  }) async {
+    final durationMs = await probeAudioDuration(sourcePath);
+    final bytes = await _fetchBytes(sourcePath);
+    final stored = _WebAudio(
+      title: fileName,
+      durationMs: durationMs,
+      mimeType: _audioMime(fileName),
+      bytes: bytes,
+    );
+    _audio[_key(projectId, assetId)] = stored;
+    return ImportedAudio(
+      assetId: assetId,
+      title: fileName,
+      durationMs: durationMs,
+      url: stored.ensureUrl(),
+    );
+  }
 
   @override
-  Future<void> deleteAudio(ImportedAudio audio) async {}
+  Future<void> deleteAudio(ImportedAudio audio) async {
+    final suffix = '/${audio.assetId}';
+    final keys = _audio.keys.where((key) => key.endsWith(suffix)).toList();
+    for (final key in keys) {
+      final stored = _audio.remove(key);
+      final url = stored?.url;
+      if (url != null) web.URL.revokeObjectURL(url);
+    }
+  }
 
   ImportedClip _clipFor(_WebClip stored) => ImportedClip(
     manifest: stored.manifest,
@@ -245,6 +320,59 @@ class WebVideoMediaService implements VideoMediaService {
     video.onerror = null;
     video.removeAttribute('src');
     video.load();
+  }
+
+  web.HTMLAudioElement _createAudio(String source) {
+    final audio = web.HTMLAudioElement()
+      ..src = source
+      ..preload = 'auto';
+    audio.load();
+    return audio;
+  }
+
+  Future<void> _readyAudio(web.HTMLAudioElement audio) {
+    final completer = Completer<void>();
+    audio.onloadedmetadata = ((web.Event event) {
+      if (!completer.isCompleted) completer.complete();
+    }).toJS;
+    audio.onerror = ((web.Event event) {
+      if (!completer.isCompleted) {
+        completer.completeError(
+          const FormatException('That audio file could not be read.'),
+        );
+      }
+    }).toJS;
+    return completer.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () =>
+          throw const FormatException('Reading that audio timed out.'),
+    );
+  }
+
+  void _releaseAudio(web.HTMLAudioElement audio) {
+    audio.onloadedmetadata = null;
+    audio.onerror = null;
+    audio.removeAttribute('src');
+    audio.load();
+  }
+
+  Future<Uint8List> _fetchBytes(String sourcePath) async {
+    final response = await web.window.fetch(sourcePath.toJS).toDart;
+    final buffer = (await response.arrayBuffer().toDart).toDart;
+    return buffer.asUint8List();
+  }
+
+  String _audioMime(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.wav')) return 'audio/wav';
+    if (lower.endsWith('.ogg') || lower.endsWith('.opus')) return 'audio/ogg';
+    if (lower.endsWith('.m4a') ||
+        lower.endsWith('.aac') ||
+        lower.endsWith('.mp4')) {
+      return 'audio/mp4';
+    }
+    if (lower.endsWith('.flac')) return 'audio/flac';
+    return 'audio/mpeg';
   }
 
   double _fitScale(int width, int height) {

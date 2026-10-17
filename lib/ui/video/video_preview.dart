@@ -108,16 +108,20 @@ class _VideoPreviewState extends State<VideoPreview> {
     final clip = _clip;
     final cache = _clipCache;
     if (clip == null || cache == null) {
-      if (_background != null) {
-        _background!.dispose();
-        setState(() => _background = null);
-      }
+      // Always repaint: with an artwork background there is no decoded frame to
+      // trigger a rebuild, and a frozen painter would hide the animation.
+      final previous = _background;
+      setState(() {
+        _background = null;
+        _revision++;
+      });
+      previous?.dispose();
       return;
     }
     final index = clipFrameIndexFor(
       timeline: widget.studio.video,
       manifest: clip.manifest,
-      timeMs: widget.playback.positionMs,
+      timeMs: _paintTimeMs,
     );
     final cached = cache.peek(index);
     if (cached != null) {
@@ -159,6 +163,18 @@ class _VideoPreviewState extends State<VideoPreview> {
         decodeWidth: _paintSize.width > 0 ? (_paintSize.width * 2).round() : 720,
       );
     }
+  }
+
+  /// The instant the preview paints.
+  ///
+  /// While idle at the very start of the card it paints the settled frame, so
+  /// an entrance animation never leaves an apparently blank preview before the
+  /// user presses play.
+  int get _paintTimeMs {
+    final playback = widget.playback;
+    final position = playback.positionMs;
+    if (playback.playing || position > 0) return position;
+    return widget.studio.video.settledTimeMs;
   }
 
   String _imageSignature(DesignDocument document) {
@@ -273,7 +289,7 @@ class _VideoPreviewState extends State<VideoPreview> {
                             painter: VideoFramePainter(
                               renderer: renderer,
                               timeline: timeline,
-                              timeMs: widget.playback.positionMs,
+                              timeMs: _paintTimeMs,
                               backgroundFrame: _background,
                               revision: _revision,
                             ),

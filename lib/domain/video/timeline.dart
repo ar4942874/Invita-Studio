@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show Offset;
 
 /// Video-invitation timeline model.
@@ -18,7 +19,7 @@ abstract final class TimelineLimits {
   static const int maxLayersWithMotion = 50;
 
   /// Slide distance in document units (the document is always 1080 wide).
-  static const double slideDistance = 96;
+  static const double slideDistance = 120;
 
   static const int maxAudioVolume = 100;
   static const int maxFadeMs = 5000;
@@ -57,6 +58,8 @@ enum MotionEasing {
   linear('linear', 'Linear'),
   easeIn('easeIn', 'Ease in'),
   easeOut('easeOut', 'Ease out'),
+  easeOutCubic('easeOutCubic', 'Ease out (soft)'),
+  easeOutBack('easeOutBack', 'Ease out (overshoot)'),
   easeInOut('easeInOut', 'Ease in-out');
 
   const MotionEasing(this.wireName, this.label);
@@ -76,8 +79,18 @@ enum MotionEasing {
       MotionEasing.linear => x,
       MotionEasing.easeIn => x * x,
       MotionEasing.easeOut => 1 - (1 - x) * (1 - x),
+      MotionEasing.easeOutCubic => 1 - math.pow(1 - x, 3).toDouble(),
+      MotionEasing.easeOutBack => _easeOutBack(x),
       MotionEasing.easeInOut => x * x * (3 - 2 * x),
     };
+  }
+
+  /// Overshoots past 1 near the end, then settles — the "spring/pop" feel.
+  static double _easeOutBack(double x) {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    final p = x - 1;
+    return 1 + c3 * p * p * p + c1 * p * p;
   }
 }
 
@@ -210,11 +223,14 @@ class LayerMotion {
 /// agree on what "Rise up" means. The UI keeps the pro controls for individual
 /// layers behind an "Advanced" toggle; a preset simply writes the same model.
 enum MotionPreset {
-  none('none', 'No animation', 'A still card'),
-  rise('rise', 'Rise up', 'Text and photos float gently up'),
-  zoomIn('zoomIn', 'Zoom in', 'Everything grows into place'),
-  zoomOut('zoomOut', 'Zoom out', 'Everything settles from larger'),
-  stagger('stagger', 'One by one', 'Layers appear in sequence');
+  none('none', 'None', 'A still card, no motion'),
+  fade('fade', 'Fade in', 'Everything fades in softly'),
+  rise('rise', 'Rise up', 'Text and photos float up as they appear'),
+  zoomIn('zoomIn', 'Zoom in', 'The card grows into place'),
+  zoomOut('zoomOut', 'Zoom out', 'The card settles in from larger'),
+  pop('pop', 'Pop', 'Layers spring in with a light bounce'),
+  slide('slide', 'Slide in', 'Layers glide in from the sides'),
+  stagger('stagger', 'One by one', 'Layers appear in a gentle sequence');
 
   const MotionPreset(this.wireName, this.label, this.tagline);
   final String wireName;
@@ -222,7 +238,7 @@ enum MotionPreset {
   final String tagline;
 
   /// Entrance length shared by every preset.
-  static const int entranceMs = 700;
+  static const int entranceMs = 800;
 
   /// Builds the per-layer motions a preset writes over a clean window.
   ///
@@ -235,11 +251,15 @@ enum MotionPreset {
     final span = durationMs
         .clamp(TimelineLimits.minDurationMs, TimelineLimits.maxDurationMs)
         .toInt();
-    Motion entrance(MotionEffect effect, {int delayMs = 0}) => Motion(
+    Motion entrance(
+      MotionEffect effect, {
+      MotionEasing easing = MotionEasing.easeOut,
+      int delayMs = 0,
+    }) => Motion(
       effect: effect,
       durationMs: entranceMs,
       delayMs: delayMs,
-      easing: MotionEasing.easeOut,
+      easing: easing,
     );
     LayerMotion layer(Motion value) => LayerMotion(
       visibleStartMs: 0,
@@ -247,33 +267,72 @@ enum MotionPreset {
       entrance: value,
     );
 
+    final count = layerIds.length;
+    // Keep the last entrance inside the card and inside the decoder's delay
+    // limit, so a saved project always re-loads and exports.
+    final maxDelay = (span - entranceMs).clamp(0, 10000);
+    int staggerDelay(int index) {
+      if (count <= 1) return 0;
+      final step = (maxDelay / (count - 1)).floor().clamp(0, 220);
+      return (index * step).clamp(0, maxDelay).toInt();
+    }
+
     switch (this) {
       case MotionPreset.none:
         return const <String, LayerMotion>{};
+      case MotionPreset.fade:
+        return {
+          for (final id in layerIds)
+            id: layer(entrance(MotionEffect.fade, easing: MotionEasing.easeInOut)),
+        };
       case MotionPreset.rise:
         return {
-          for (final id in layerIds) id: layer(entrance(MotionEffect.slideUp)),
+          for (final id in layerIds)
+            id: layer(
+              entrance(MotionEffect.slideUp, easing: MotionEasing.easeOutBack),
+            ),
         };
       case MotionPreset.zoomIn:
         return {
-          for (final id in layerIds) id: layer(entrance(MotionEffect.zoomIn)),
+          for (final id in layerIds)
+            id: layer(
+              entrance(MotionEffect.zoomIn, easing: MotionEasing.easeOutCubic),
+            ),
         };
       case MotionPreset.zoomOut:
         return {
-          for (final id in layerIds) id: layer(entrance(MotionEffect.zoomOut)),
+          for (final id in layerIds)
+            id: layer(
+              entrance(MotionEffect.zoomOut, easing: MotionEasing.easeOutCubic),
+            ),
         };
-      case MotionPreset.stagger:
-        final count = layerIds.length;
-        // Keep the last entrance inside the card and inside the decoder's
-        // delay limit, so a saved project always re-loads and exports.
-        final maxDelay = (span - entranceMs).clamp(0, 10000);
-        final step = count <= 1
-            ? 0
-            : (maxDelay / (count - 1)).floor().clamp(0, 900);
+      case MotionPreset.pop:
+        return {
+          for (final id in layerIds)
+            id: layer(
+              entrance(MotionEffect.zoomIn, easing: MotionEasing.easeOutBack),
+            ),
+        };
+      case MotionPreset.slide:
         return {
           for (var i = 0; i < count; i++)
             layerIds[i]: layer(
-              entrance(MotionEffect.slideUp, delayMs: i * step),
+              entrance(
+                i.isEven ? MotionEffect.slideLeft : MotionEffect.slideRight,
+                easing: MotionEasing.easeOutCubic,
+                delayMs: staggerDelay(i),
+              ),
+            ),
+        };
+      case MotionPreset.stagger:
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(
+                MotionEffect.slideUp,
+                easing: MotionEasing.easeOut,
+                delayMs: staggerDelay(i),
+              ),
             ),
         };
     }
@@ -588,6 +647,24 @@ class VideoTimeline {
   /// Number of frames an export writes. Integer math keeps it deterministic.
   int get frameCount => (durationMs * fps) ~/ 1000;
 
+  /// A time at which every entrance has finished and no exit has begun.
+  ///
+  /// The preview shows this frame when it is idle at the start of the card, so
+  /// an entrance animation does not leave an apparently blank card before the
+  /// user presses play.
+  int get settledTimeMs {
+    var settled = 0;
+    for (final motion in motions.values) {
+      final end =
+          motion.visibleStartMs +
+          motion.entrance.delayMs +
+          motion.entrance.durationMs;
+      if (end > settled) settled = end;
+    }
+    final limit = durationMs > 0 ? durationMs - 1 : 0;
+    return settled.clamp(0, limit).toInt();
+  }
+
   /// Timestamp of a frame, in microseconds since the start of the video.
   ///
   /// Timestamps are derived from the frame index only, never from wall-clock
@@ -852,12 +929,12 @@ _EffectResult _applyEffect(
     MotionEffect.zoomIn => _EffectResult(
       visible,
       Offset.zero,
-      entering ? 0.9 + 0.1 * p : 1 + 0.1 * p,
+      entering ? 0.82 + 0.18 * p : 1 + 0.18 * p,
     ),
     MotionEffect.zoomOut => _EffectResult(
       visible,
       Offset.zero,
-      entering ? 1.1 - 0.1 * p : 1 - 0.1 * p,
+      entering ? 1.18 - 0.18 * p : 1 - 0.18 * p,
     ),
   };
 }

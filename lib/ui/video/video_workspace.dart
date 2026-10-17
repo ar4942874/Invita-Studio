@@ -3,6 +3,7 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 import '../../application/studio_controller.dart';
 import '../../domain/video/timeline.dart';
+import '../../services/video/video_audio_platform.dart';
 import '../../services/video/video_media.dart';
 import '../../services/video/video_media_platform.dart';
 import '../studio_theme.dart';
@@ -36,6 +37,7 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
     with SingleTickerProviderStateMixin {
   late final VideoPlaybackController _playback;
   late final VideoMediaService _store;
+  late final VideoAudioPlayer _audio;
   VideoMediaBundle _media = VideoMediaBundle.empty;
   String? _loadedClipId;
   String? _loadedAudioId;
@@ -46,11 +48,13 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
   void initState() {
     super.initState();
     _store = createVideoMediaService();
+    _audio = createVideoAudioPlayer();
     final timeline = widget.studio.video;
     _playback = VideoPlaybackController(
       vsync: this,
       durationMs: timeline.durationMs,
     );
+    _playback.addListener(_onPlaybackTick);
     _loadedDuration = timeline.durationMs;
     widget.studio.addListener(_onStudioChanged);
     _loadMedia();
@@ -59,8 +63,26 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
   @override
   void dispose() {
     widget.studio.removeListener(_onStudioChanged);
+    _playback.removeListener(_onPlaybackTick);
+    _audio.dispose();
     _playback.dispose();
     super.dispose();
+  }
+
+  void _onPlaybackTick() {
+    _audio.update(
+      positionMs: _playback.positionMs,
+      playing: _playback.playing,
+    );
+  }
+
+  /// Pushes the current music selection and mix settings to the preview player.
+  void _configureAudio() {
+    _audio.configure(
+      audio: _media.audio,
+      settings: widget.studio.video.audio,
+      timelineDurationMs: widget.studio.video.durationMs,
+    );
   }
 
   void _onStudioChanged() {
@@ -73,6 +95,8 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
         timeline.audio?.assetId != _loadedAudioId) {
       _loadMedia();
     }
+    _configureAudio();
+    _onPlaybackTick();
   }
 
   Future<void> _loadMedia() async {
@@ -103,6 +127,7 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
         audioMissing: audioId != null && audio == null,
       );
     });
+    _configureAudio();
   }
 
   DesignNode? get _selected {
@@ -839,9 +864,12 @@ class _MotionInspectorState extends State<_MotionInspector> {
 
 IconData _presetIcon(MotionPreset preset) => switch (preset) {
   MotionPreset.none => Icons.horizontal_rule,
+  MotionPreset.fade => Icons.blur_on,
   MotionPreset.rise => Icons.arrow_upward_rounded,
   MotionPreset.zoomIn => Icons.zoom_in,
   MotionPreset.zoomOut => Icons.zoom_out,
+  MotionPreset.pop => Icons.auto_awesome,
+  MotionPreset.slide => Icons.swap_horiz,
   MotionPreset.stagger => Icons.view_timeline_outlined,
 };
 

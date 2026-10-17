@@ -21,6 +21,7 @@ The host is a Flutter application with a `ChangeNotifier` coordinator. No second
 | `lib/services/video/video_media_platform.dart` | Conditional native/browser `VideoMediaService` factory |
 | `lib/services/video/video_encoder.dart` | Encoder spec/session interface (`EncodedVideo` result) and the native `invita/video_export` backend |
 | `lib/services/video/video_encoder_platform.dart` | Conditional native/browser `VideoEncoderBackend` factory (`MediaRecorder` on the web) |
+| `lib/services/video/video_audio_player*.dart` | Conditional preview-music player: `<audio>` on the web, no-op on native |
 | `lib/services/video/video_export_service.dart` | Frozen-snapshot exporter, progress, cancellation, temp cleanup |
 | `lib/ui/video/` | Video workspace, preview, transport, settings sheet and MP4 export dialog |
 | `lib/application/studio_controller.dart` | Serialized host edits, two-way field state, reflow, styling, layer actions, drafts and save status |
@@ -83,7 +84,7 @@ Video mode is a second **view over the same document**, not a second project. `S
 
 `VideoTimeline` is deliberately Flutter-free and versioned. `evaluateTimeline(timeline, layerIds, timeMs)` is the only animation evaluator; it returns opacity, offset and uniform scale per layer. The same function feeds the live preview and the exporter. Entrance effects settle at their neutral value; exits run the same effect away from it. Layers without an entry are visible for the whole timeline.
 
-`MotionPreset` (same file) sits above that model: the layman UI applies a named whole-card style (`rise`, `zoomIn`, `zoomOut`, `stagger`, `none`) and the preset method expands it into ordinary per-layer `LayerMotion` values. Because it only writes the shared model, neither the preview nor the exporter knows presets exist. `MotionPreset.detect` compares a timeline back to each preset so the gallery can show which style is active.
+`MotionPreset` (same file) sits above that model: the layman UI applies a named whole-card style (`fade`, `rise`, `zoomIn`, `zoomOut`, `pop`, `slide`, `stagger`, `none`) and the preset method expands it into ordinary per-layer `LayerMotion` values. Because it only writes the shared model, neither the preview nor the exporter knows presets exist. `MotionPreset.detect` compares a timeline back to each preset so the gallery can show which style is active.
 
 `TimelineFrameRenderer.paintFrame` is shared by the preview (`VideoFramePainter`) and the exporter (`renderImage` → raw RGBA):
 
@@ -108,7 +109,7 @@ instead:
 
 Android implements the encoder with `MediaCodec`/`MediaMuxer` (H.264 Baseline preferred, AAC-LC 128 kb/s) and applies music trim/gain/fades while decoding to PCM. iOS uses `AVAssetWriter` and, for music, an `AVMutableComposition` second pass with passthrough when no gain/fade is needed. Desktop has no encoder: `isVideoExportSupported` is false and the dialog explains that only preview/editing is available.
 
-On the web, `video_encoder_web.dart` records the rendered canvas through `MediaRecorder` (silent WebM/MP4) and downloads it via `saveBytes`, and `video_media_service_web.dart` decodes a picked clip into in-memory PNG frames for the session (`ImportedClip.frameReader`). `VideoExporter` guards the temp file, rename and audio muxing with `kIsWeb`.
+On the web, `video_encoder_web.dart` records the rendered canvas through `MediaRecorder` (silent WebM/MP4) and downloads it via `saveBytes`, and `video_media_service_web.dart` decodes a picked clip into in-memory PNG frames for the session (`ImportedClip.frameReader`). Imported music is probed with an `<audio>` element, kept in memory and previewed by `video_audio_player_web.dart` (trim start, volume, fades); the browser export stays silent. `VideoExporter` guards the temp file, rename and audio muxing with `kIsWeb`.
 
 Imported media lives under `<documents>/InvitaStudioMedia/<projectId>/` with a JSON manifest per clip. Project JSON stores IDs and trims only, so projects stay small; the trade-off is that portable JSON does not carry media and must be relinked, and browser imports are not persisted at all. Missing media is a first-class state in the preview and settings sheet.
 
