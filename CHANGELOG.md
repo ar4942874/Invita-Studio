@@ -8,6 +8,7 @@
 - Added real browser video export through `MediaRecorder` (silent WebM/MP4), alongside the native H.264/AAC encoders.
 - Video edits (length, trim, fades, volume, per-layer motion) now share the same undo/redo history as image edits, with a slider drag coalesced into a single step.
 - Honored the OS/browser "reduce motion" setting: applying an animation preset settles on the final frame instead of auto-playing.
+- Improved screen-reader support: export progress and results are announced, the video sliders report their values with units, and the video preview exposes a descriptive label.
 - `flutter analyze` clean and the full test suite green on Flutter 3.47.7 / Dart 3.13.5.
 
 # 1.0.0 — image-first implementation

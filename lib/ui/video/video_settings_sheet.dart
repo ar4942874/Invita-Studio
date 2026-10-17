@@ -312,6 +312,8 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
                           TimelineLimits.maxDurationMs,
                         )
                         .toDouble(),
+                    semanticFormatterCallback: (value) =>
+                        '${(value / 1000).toStringAsFixed(1)} seconds',
                     onChangeStart: (_) => widget.studio.beginVideoSession(),
                     onChangeEnd: (_) => widget.studio.endVideoSession(),
                     onChanged: (value) => _setDuration(value.round()),
@@ -511,6 +513,8 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
                       max: 100,
                       divisions: 20,
                       value: _timeline.audio!.volume.toDouble(),
+                      semanticFormatterCallback: (value) =>
+                          '${value.round()} percent',
                       onChangeStart: (_) => widget.studio.beginVideoSession(),
                       onChangeEnd: (_) => widget.studio.endVideoSession(),
                       onChanged: (value) => _update(
@@ -556,6 +560,8 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
                       value: _timeline.audio!.startMs
                           .clamp(0, (timeline.durationMs - 500).clamp(1, 29500))
                           .toDouble(),
+                      semanticFormatterCallback: (value) =>
+                          '${(value / 1000).toStringAsFixed(1)} seconds in',
                       onChangeStart: (_) => widget.studio.beginVideoSession(),
                       onChangeEnd: (_) => widget.studio.endVideoSession(),
                       onChanged: (value) => _update(
@@ -744,6 +750,8 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
                   .clamp((startMs + 1).clamp(1, safeMax), safeMax)
                   .toDouble(),
             ),
+            semanticFormatterCallback: (value) =>
+                '${(value / 1000).toStringAsFixed(1)} seconds',
             onChangeStart: (_) => widget.studio.beginVideoSession(),
             onChangeEnd: (_) => widget.studio.endVideoSession(),
             onChanged: (values) =>
@@ -771,6 +779,8 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
             max: TimelineLimits.maxFadeMs.toDouble(),
             divisions: 20,
             value: value.clamp(0, TimelineLimits.maxFadeMs).toDouble(),
+            semanticFormatterCallback: (value) =>
+                '${(value / 1000).toStringAsFixed(1)} seconds',
             onChangeStart: (_) => widget.studio.beginVideoSession(),
             onChangeEnd: (_) => widget.studio.endVideoSession(),
             onChanged: (next) => onChanged(next.round()),

@@ -1,8 +1,22 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../studio_theme.dart';
+
+/// Announces [message] to screen readers on platforms that support it.
+///
+/// Used for asynchronous progress that a sighted user sees as a spinner or a
+/// status line, so assistive technology is told the same thing.
+void announceForAccessibility(BuildContext context, String message) {
+  if (!MediaQuery.supportsAnnounceOf(context)) return;
+  SemanticsService.sendAnnouncement(
+    View.of(context),
+    message,
+    Directionality.of(context),
+  );
+}
 
 class BoundInput extends StatefulWidget {
   const BoundInput({

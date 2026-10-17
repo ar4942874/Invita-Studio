@@ -798,6 +798,8 @@ class _MotionInspectorState extends State<_MotionInspector> {
             min: 0,
             max: duration.toDouble(),
             values: RangeValues(start.toDouble(), end.toDouble()),
+            semanticFormatterCallback: (value) =>
+                '${(value / 1000).toStringAsFixed(1)} seconds',
             onChangeStart: (_) => widget.studio.beginVideoSession(),
             onChangeEnd: (_) => widget.studio.endVideoSession(),
             onChanged: (values) => update(
@@ -852,6 +854,8 @@ class _MotionInspectorState extends State<_MotionInspector> {
             max: 3000,
             divisions: 29,
             value: motion.durationMs.clamp(100, 3000).toDouble(),
+            semanticFormatterCallback: (value) =>
+                '${(value / 1000).toStringAsFixed(1)} seconds',
             onChangeStart: (_) => widget.studio.beginVideoSession(),
             onChangeEnd: (_) => widget.studio.endVideoSession(),
             onChanged: (value) =>

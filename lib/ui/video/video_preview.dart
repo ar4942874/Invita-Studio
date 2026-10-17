@@ -246,7 +246,7 @@ class _VideoPreviewState extends State<VideoPreview> {
     final timeline = widget.studio.video;
     final aspect = document.width / document.height;
     final renderer = _renderer;
-    return AspectRatio(
+    final preview = AspectRatio(
       aspectRatio: aspect,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -323,6 +323,12 @@ class _VideoPreviewState extends State<VideoPreview> {
           );
         },
       ),
+    );
+    return Semantics(
+      image: true,
+      container: true,
+      label: 'Invitation video preview',
+      child: preview,
     );
   }
 }

@@ -195,4 +195,19 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
   });
+  testWidgets('video preview exposes an accessible label', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await mount(tester, const Size(1440, 1000));
+    await tester.tap(find.text('Video'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.bySemanticsLabel('Invitation video preview'), findsOneWidget);
+
+    semantics.dispose();
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+  });
 }

@@ -37,15 +37,25 @@ class _ExportDialogState extends State<ExportDialog> {
       _error = null;
       _message = null;
     });
+    announceForAccessibility(context, 'Preparing your invitation.');
     try {
       final result = await ExportService.render(
         widget.studio,
         format: _format,
         scale: _scale,
       );
-      if (mounted) setState(() => _file = result);
+      if (mounted) {
+        setState(() => _file = result);
+        announceForAccessibility(
+          context,
+          'Invitation ready, ${result.width} by ${result.height} pixels.',
+        );
+      }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Could not create the image. $e');
+      if (mounted) {
+        setState(() => _error = 'Could not create the image. $e');
+        announceForAccessibility(context, 'Could not create the image.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -57,13 +67,17 @@ class _ExportDialogState extends State<ExportDialog> {
     setState(() => _actionBusy = true);
     try {
       final message = await saveBytes(file.bytes, file.name, file.mime);
-      if (mounted) setState(() => _message = message);
+      if (mounted) {
+        setState(() => _message = message);
+        if (message != null) announceForAccessibility(context, message);
+      }
     } catch (_) {
       if (mounted) {
         setState(
           () => _error =
               'The image could not be saved. Try Share, or download again.',
         );
+        announceForAccessibility(context, 'The image could not be saved.');
       }
     } finally {
       if (mounted) setState(() => _actionBusy = false);
@@ -98,6 +112,7 @@ class _ExportDialogState extends State<ExportDialog> {
               ? 'Sharing cancelled.'
               : 'Sharing is handled by your device. Delivery is not confirmed here.',
         );
+        announceForAccessibility(context, _message!);
       }
     } catch (_) {
       if (mounted) {
@@ -106,6 +121,7 @@ class _ExportDialogState extends State<ExportDialog> {
               ? 'File sharing is not available in this browser. Download the image instead.'
               : 'The device could not open sharing. Save the file and try again.',
         );
+        announceForAccessibility(context, _error!);
       }
     } finally {
       if (mounted) setState(() => _actionBusy = false);

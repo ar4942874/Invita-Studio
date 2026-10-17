@@ -10,6 +10,7 @@ import '../../services/video/video_export_service.dart';
 import '../../services/video/video_media.dart';
 import '../../services/video/video_media_platform.dart';
 import '../studio_theme.dart';
+import '../widgets/controls.dart';
 
 enum VideoQuality {
   full('Story 1080p', '1080 × 1920 · 30 fps · about 8 Mbps'),
@@ -134,6 +135,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
         frameCount: timeline.frameCount,
       );
     });
+    announceForAccessibility(context, 'Exporting video.');
     try {
       final projectId = widget.studio.project.id;
       final clipId = timeline.background.assetId;
@@ -170,6 +172,10 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
         _result = result;
         _running = false;
       });
+      announceForAccessibility(
+        context,
+        'Video ready, ${result.width} by ${result.height} pixels.',
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -178,6 +184,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
             ? error.message
             : 'The video could not be exported.';
       });
+      announceForAccessibility(context, _error!);
     }
   }
 
@@ -204,9 +211,11 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
             ? 'Sharing cancelled.'
             : 'Your device handled the share. Delivery is not confirmed by this app.';
       });
+      announceForAccessibility(context, _message!);
     } catch (_) {
       if (!mounted) return;
       setState(() => _message = 'The share sheet could not be opened.');
+      announceForAccessibility(context, _message!);
     }
   }
 
