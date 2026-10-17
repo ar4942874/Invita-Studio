@@ -203,6 +203,139 @@ class LayerMotion {
   }
 }
 
+/// A one-tap animation style for the whole invitation card.
+///
+/// Presets are pure and Flutter-free: [build] turns the current layer IDs into
+/// per-layer motions, so the interactive preview, the exporter and the tests all
+/// agree on what "Rise up" means. The UI keeps the pro controls for individual
+/// layers behind an "Advanced" toggle; a preset simply writes the same model.
+enum MotionPreset {
+  none('none', 'No animation', 'A still card'),
+  rise('rise', 'Rise up', 'Text and photos float gently up'),
+  zoomIn('zoomIn', 'Zoom in', 'Everything grows into place'),
+  zoomOut('zoomOut', 'Zoom out', 'Everything settles from larger'),
+  stagger('stagger', 'One by one', 'Layers appear in sequence');
+
+  const MotionPreset(this.wireName, this.label, this.tagline);
+  final String wireName;
+  final String label;
+  final String tagline;
+
+  /// Entrance length shared by every preset.
+  static const int entranceMs = 700;
+
+  /// Builds the per-layer motions a preset writes over a clean window.
+  ///
+  /// The visibility window always spans the whole card (clamped to
+  /// [TimelineLimits.maxDurationMs]) so the animation survives a length change.
+  Map<String, LayerMotion> build({
+    required List<String> layerIds,
+    required int durationMs,
+  }) {
+    final span = durationMs
+        .clamp(TimelineLimits.minDurationMs, TimelineLimits.maxDurationMs)
+        .toInt();
+    Motion entrance(MotionEffect effect, {int delayMs = 0}) => Motion(
+      effect: effect,
+      durationMs: entranceMs,
+      delayMs: delayMs,
+      easing: MotionEasing.easeOut,
+    );
+    LayerMotion layer(Motion value) => LayerMotion(
+      visibleStartMs: 0,
+      visibleEndMs: span,
+      entrance: value,
+    );
+
+    switch (this) {
+      case MotionPreset.none:
+        return const <String, LayerMotion>{};
+      case MotionPreset.rise:
+        return {
+          for (final id in layerIds) id: layer(entrance(MotionEffect.slideUp)),
+        };
+      case MotionPreset.zoomIn:
+        return {
+          for (final id in layerIds) id: layer(entrance(MotionEffect.zoomIn)),
+        };
+      case MotionPreset.zoomOut:
+        return {
+          for (final id in layerIds) id: layer(entrance(MotionEffect.zoomOut)),
+        };
+      case MotionPreset.stagger:
+        final count = layerIds.length;
+        // Keep the last entrance inside the card and inside the decoder's
+        // delay limit, so a saved project always re-loads and exports.
+        final maxDelay = (span - entranceMs).clamp(0, 10000);
+        final step = count <= 1
+            ? 0
+            : (maxDelay / (count - 1)).floor().clamp(0, 900);
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(MotionEffect.slideUp, delayMs: i * step),
+            ),
+        };
+    }
+  }
+
+  /// Whether [motions] is exactly what this preset writes for [layerIds].
+  bool matches({
+    required Iterable<String> layerIds,
+    required int durationMs,
+    required Map<String, LayerMotion> motions,
+  }) {
+    final ids = layerIds.toList();
+    final expected = build(layerIds: ids, durationMs: durationMs);
+    final idSet = ids.toSet();
+    for (final key in motions.keys) {
+      if (!idSet.contains(key)) return false;
+    }
+    for (final id in ids) {
+      final actual = motions[id] ?? const LayerMotion();
+      final want = expected[id] ?? const LayerMotion();
+      if (!_sameLayerMotion(actual, want, durationMs)) return false;
+    }
+    return true;
+  }
+
+  /// The preset a timeline currently matches, or null when it is custom.
+  static MotionPreset? detect({
+    required Iterable<String> layerIds,
+    required int durationMs,
+    required Map<String, LayerMotion> motions,
+  }) {
+    for (final preset in MotionPreset.values) {
+      if (preset.matches(
+        layerIds: layerIds,
+        durationMs: durationMs,
+        motions: motions,
+      )) {
+        return preset;
+      }
+    }
+    return null;
+  }
+
+  static bool _sameLayerMotion(LayerMotion a, LayerMotion b, int durationMs) =>
+      _normEnd(a.visibleEndMs, durationMs) ==
+          _normEnd(b.visibleEndMs, durationMs) &&
+      a.visibleStartMs == b.visibleStartMs &&
+      _sameMotion(a.entrance, b.entrance) &&
+      _sameMotion(a.exit, b.exit);
+
+  /// A window that reaches [durationMs] or beyond is treated as "the whole
+  /// card", because the timeline clamps store-side ends to the current length.
+  static int _normEnd(int end, int durationMs) =>
+      end >= durationMs ? durationMs : end;
+
+  static bool _sameMotion(Motion a, Motion b) =>
+      a.effect == b.effect &&
+      a.durationMs == b.durationMs &&
+      a.delayMs == b.delayMs &&
+      a.easing == b.easing;
+}
+
 /// What fills the frame behind the invitation layers.
 enum BackgroundKind {
   artwork('artwork'),

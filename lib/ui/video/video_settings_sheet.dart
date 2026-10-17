@@ -1,11 +1,11 @@
-import 'dart:io';
-
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../application/studio_controller.dart';
 import '../../domain/video/timeline.dart';
 import '../../services/video/video_media.dart';
+import '../../services/video/video_media_platform.dart';
 import '../studio_theme.dart';
 
 const videoTypeGroup = XTypeGroup(
@@ -44,8 +44,7 @@ class VideoSettingsSheet extends StatefulWidget {
 }
 
 class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
-  final VideoMediaStore _store = VideoMediaStore();
-  final VideoMediaChannel _channel = VideoMediaChannel();
+  final VideoMediaService _service = createVideoMediaService();
   ImportedClip? _clip;
   ImportedAudio? _audio;
   bool _clipMissing = false;
@@ -56,7 +55,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
   double _progress = 0;
   int _storageBytes = 0;
 
-  VideoTimeline get _timeline => widget.studio.video;
+  VideoTimeline get _timeline => widget.studio.project.video;
 
   @override
   void initState() {
@@ -66,7 +65,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
   }
 
   Future<void> _refreshStorage() async {
-    final bytes = await _store.projectBytes(widget.studio.project.id);
+    final bytes = await _service.projectBytes(widget.studio.project.id);
     if (mounted) setState(() => _storageBytes = bytes);
   }
 
@@ -75,10 +74,10 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
     final audioId = _timeline.audio?.assetId;
     final clip = clipId == null
         ? null
-        : await _store.loadClip(widget.studio.project.id, clipId);
+        : await _service.loadClip(widget.studio.project.id, clipId);
     final audio = audioId == null
         ? null
-        : await _store.loadAudio(
+        : await _service.loadAudio(
             widget.studio.project.id,
             audioId,
             title: _timeline.audio?.title,
@@ -95,10 +94,31 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
 
   void _update(VideoTimeline next) => widget.studio.updateVideo(next);
 
+  /// Changes the card length. Reads the stored timeline so existing windows are
+  /// preserved, and re-fits the current whole-card preset (its stagger timing
+  /// depends on the length) so the card still validates after resizing.
+  void _setDuration(int valueMs) {
+    final next = (valueMs / 500).round() * 500;
+    final timeline = _timeline;
+    final layerIds = widget.studio.project.layerIds.toList();
+    final preset = MotionPreset.detect(
+      layerIds: layerIds,
+      durationMs: widget.studio.video.durationMs,
+      motions: widget.studio.video.motions,
+    );
+    var updated = timeline.copyWith(durationMs: next);
+    if (preset != null) {
+      updated = updated.copyWith(
+        motions: preset.build(layerIds: layerIds, durationMs: next),
+      );
+    }
+    _update(updated);
+  }
+
   Future<void> _importClip() async {
-    if (!_channel.isSupported) {
+    if (!_service.isSupported) {
       _toast(
-        'Background video import needs the Android or iOS app. '
+        'Background video import is not available on this platform. '
         'The bundled artwork works everywhere.',
       );
       return;
@@ -114,20 +134,11 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
       _progress = 0;
     });
     try {
-      final probe = await _channel.probeVideo(file.path);
-      if (probe.durationMs <= 0 || probe.width <= 0) {
-        throw const FormatException('That file is not a readable video.');
-      }
-      final dir = await _store.clipDir(widget.studio.project.id, assetId);
-      final total = _expectedFrames(probe.durationMs);
-      setState(() => _status = 'Extracting $total frames…');
-      final extracted = await _channel.extractFrames(
+      final result = await _service.extractClip(
         sourcePath: file.path,
-        outputDir: dir.path,
-        fps: ClipLimits.extractionFps,
-        maxFrames: ClipLimits.maxFrames,
-        maxWidth: ClipLimits.maxWidth,
-        maxHeight: ClipLimits.maxHeight,
+        title: file.name,
+        projectId: widget.studio.project.id,
+        assetId: assetId,
         onProgress: (done, total) {
           if (!mounted) return;
           setState(() {
@@ -139,24 +150,10 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
         },
       );
       if (_cancelled) {
-        await _store.deleteClip(widget.studio.project.id, assetId);
+        await _service.deleteClip(widget.studio.project.id, assetId);
         throw const FormatException('Import cancelled.');
       }
-      final manifest = ClipManifest(
-        assetId: assetId,
-        title: file.name,
-        sourceDurationMs: probe.durationMs,
-        sourceWidth: probe.width,
-        sourceHeight: probe.height,
-        fps: ClipLimits.extractionFps,
-        frameWidth: extracted.width,
-        frameHeight: extracted.height,
-        frameCount: extracted.count,
-        framePattern: 'f%05d.jpg',
-        hasAudio: probe.hasAudio,
-      );
-      await _store.writeClipManifest(widget.studio.project.id, manifest);
-      final clipDuration = manifest.proxyDurationMs;
+      final clipDuration = result.manifest.proxyDurationMs;
       _update(
         _timeline.copyWith(
           enabled: true,
@@ -186,14 +183,6 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
     }
   }
 
-  int _expectedFrames(int durationMs) {
-    final seconds = durationMs / 1000;
-    return (seconds * ClipLimits.extractionFps)
-        .round()
-        .clamp(1, ClipLimits.maxFrames)
-        .toInt();
-  }
-
   Future<void> _removeClip() async {
     final assetId = _timeline.background.assetId;
     _update(
@@ -202,15 +191,18 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
       ),
     );
     if (assetId != null) {
-      await _store.deleteClip(widget.studio.project.id, assetId);
+      await _service.deleteClip(widget.studio.project.id, assetId);
     }
     await _loadMedia();
     await _refreshStorage();
   }
 
   Future<void> _importMusic() async {
-    if (!_channel.isSupported) {
-      _toast('Music import needs the Android or iOS app.');
+    if (!_service.isMusicSupported) {
+      _toast(
+        'Music import needs the Android or iOS app. '
+        'Browser exports are silent.',
+      );
       return;
     }
     final file = await openFile(acceptedTypeGroups: const [audioTypeGroup]);
@@ -220,25 +212,24 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
       _status = 'Reading music…';
     });
     try {
-      final durationMs = await _channel.probeAudioDuration(file.path);
       final assetId =
           'audio_${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
-      final extension = file.name.contains('.')
-          ? file.name.split('.').last
-          : 'm4a';
-      final path = await _store.audioPath(
-        widget.studio.project.id,
-        assetId,
-        extension,
+      final audio = await _service.importMusic(
+        sourcePath: file.path,
+        fileName: file.name,
+        projectId: widget.studio.project.id,
+        assetId: assetId,
       );
-      await File(file.path).copy(path);
+      if (audio == null) {
+        throw const FormatException('That music file could not be imported.');
+      }
       _update(
         _timeline.copyWith(
           audio: VideoAudio(
             assetId: assetId,
             title: file.name,
             startMs: 0,
-            durationMs: durationMs,
+            durationMs: audio.durationMs,
             volume: 80,
             fadeInMs: 800,
             fadeOutMs: 1200,
@@ -263,14 +254,8 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
     final id = _timeline.audio?.assetId;
     _update(_timeline.copyWith(clearAudio: true));
     if (id != null) {
-      final audio = await _store.loadAudio(widget.studio.project.id, id);
-      if (audio != null) {
-        try {
-          await File(audio.path).delete();
-        } catch (_) {
-          // Best-effort.
-        }
-      }
+      final audio = await _service.loadAudio(widget.studio.project.id, id);
+      if (audio != null) await _service.deleteAudio(audio);
     }
     await _loadMedia();
     await _refreshStorage();
@@ -321,9 +306,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
                           TimelineLimits.maxDurationMs,
                         )
                         .toDouble(),
-                    onChanged: (value) => _update(
-                      timeline.copyWith(durationMs: (value / 500).round() * 500),
-                    ),
+                    onChanged: (value) => _setDuration(value.round()),
                   ),
                 ),
                 SizedBox(
@@ -374,8 +357,12 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
               const SizedBox(height: 10),
               if (_clipMissing)
                 _warning(
-                  'This background video is missing on this device. '
-                  'Re-import it, or switch back to artwork.',
+                  kIsWeb
+                      ? 'This background video is not in memory. Browser imports '
+                            'last for the session only, so re-import it after a '
+                            'reload, or switch back to artwork.'
+                      : 'This background video is missing on this device. '
+                            'Re-import it, or switch back to artwork.',
                 )
               else if (_clip != null) ...[
                 Row(
@@ -649,7 +636,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
                   TextButton(
                     onPressed: () async {
                       setState(() => _cancelled = true);
-                      await _channel.cancelExtraction();
+                      await _service.cancelExtraction();
                     },
                     child: const Text('Cancel', style: TextStyle(fontSize: 11)),
                   ),
@@ -668,10 +655,19 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
               ],
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Imported video and music are stored on this device, not inside the '
-              'project JSON. Backups need the media relinked on another device.',
-              style: TextStyle(fontSize: 9.5, height: 1.45, color: StudioColors.muted),
+            Text(
+              kIsWeb
+                  ? 'Browser imports are decoded into memory for this session '
+                        'only and are not saved, so re-import after a reload. '
+                        'The project JSON stays small.'
+                  : 'Imported video and music are stored on this device, not '
+                        'inside the project JSON. Backups need the media '
+                        'relinked on another device.',
+              style: const TextStyle(
+                fontSize: 9.5,
+                height: 1.45,
+                color: StudioColors.muted,
+              ),
             ),
           ],
         ),

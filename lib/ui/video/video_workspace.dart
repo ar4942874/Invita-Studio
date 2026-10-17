@@ -4,6 +4,7 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import '../../application/studio_controller.dart';
 import '../../domain/video/timeline.dart';
 import '../../services/video/video_media.dart';
+import '../../services/video/video_media_platform.dart';
 import '../studio_theme.dart';
 import 'video_playback.dart';
 import 'video_preview.dart';
@@ -34,16 +35,17 @@ class VideoWorkspace extends StatefulWidget {
 class _VideoWorkspaceState extends State<VideoWorkspace>
     with SingleTickerProviderStateMixin {
   late final VideoPlaybackController _playback;
-  late final VideoMediaStore _store;
+  late final VideoMediaService _store;
   VideoMediaBundle _media = VideoMediaBundle.empty;
   String? _loadedClipId;
   String? _loadedAudioId;
   int _loadedDuration = 0;
+  bool _advanced = false;
 
   @override
   void initState() {
     super.initState();
-    _store = VideoMediaStore();
+    _store = createVideoMediaService();
     final timeline = widget.studio.video;
     _playback = VideoPlaybackController(
       vsync: this,
@@ -119,6 +121,33 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
     return node.id;
   }
 
+  /// Animatable layers in document (z) order, used for staggered presets.
+  List<String> get _layerIds => [
+    for (final node in widget.studio.document.nodes)
+      if (node.type != 'background') node.id,
+  ];
+
+  MotionPreset? get _selectedPreset => MotionPreset.detect(
+    layerIds: _layerIds,
+    durationMs: widget.studio.video.durationMs,
+    motions: widget.studio.video.motions,
+  );
+
+  void _applyPreset(MotionPreset preset) {
+    final timeline = widget.studio.video;
+    widget.studio.updateVideo(
+      timeline.copyWith(
+        enabled: true,
+        motions: preset.build(
+          layerIds: _layerIds,
+          durationMs: timeline.durationMs,
+        ),
+      ),
+    );
+    _playback.seek(0);
+    _playback.play();
+  }
+
   @override
   Widget build(BuildContext context) {
     final timeline = widget.studio.video;
@@ -153,17 +182,25 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
           onSettings: widget.onOpenSettings,
           onExport: widget.onExport,
         ),
-        _TimelinePanel(
-          studio: widget.studio,
-          playback: _playback,
-          layerName: _layerName,
-          compact: widget.compact,
+        _AnimationGallery(
+          selected: _selectedPreset,
+          advanced: _advanced,
+          onToggleAdvanced: () => setState(() => _advanced = !_advanced),
+          onApply: _applyPreset,
         ),
-        _MotionInspector(
-          studio: widget.studio,
-          node: selected,
-          layerName: selected == null ? null : _layerName(selected),
-        ),
+        if (_advanced) ...[
+          _TimelinePanel(
+            studio: widget.studio,
+            playback: _playback,
+            layerName: _layerName,
+            compact: widget.compact,
+          ),
+          _MotionInspector(
+            studio: widget.studio,
+            node: selected,
+            layerName: selected == null ? null : _layerName(selected),
+          ),
+        ],
       ],
     );
   }
@@ -797,5 +834,168 @@ class _MotionInspectorState extends State<_MotionInspector> {
       );
     }
     widget.studio.updateVideo(next);
+  }
+}
+
+IconData _presetIcon(MotionPreset preset) => switch (preset) {
+  MotionPreset.none => Icons.horizontal_rule,
+  MotionPreset.rise => Icons.arrow_upward_rounded,
+  MotionPreset.zoomIn => Icons.zoom_in,
+  MotionPreset.zoomOut => Icons.zoom_out,
+  MotionPreset.stagger => Icons.view_timeline_outlined,
+};
+
+/// The layman-facing animation picker: one tap animates the whole card.
+///
+/// The per-layer timeline and inspector stay available behind "Customize".
+class _AnimationGallery extends StatelessWidget {
+  const _AnimationGallery({
+    required this.selected,
+    required this.advanced,
+    required this.onToggleAdvanced,
+    required this.onApply,
+  });
+
+  final MotionPreset? selected;
+  final bool advanced;
+  final VoidCallback onToggleAdvanced;
+  final void Function(MotionPreset) onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: StudioColors.border)),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.auto_awesome_outlined,
+                size: 14,
+                color: StudioColors.green,
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Animation',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Pick a style for the whole card',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 9.5, color: StudioColors.muted),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onToggleAdvanced,
+                icon: Icon(advanced ? Icons.check_rounded : Icons.tune, size: 14),
+                label: Text(
+                  advanced ? 'Done' : 'Customize',
+                  style: const TextStyle(fontSize: 10.5),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(
+            height: 60,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: MotionPreset.values.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final preset = MotionPreset.values[index];
+                return _AnimationStyleCard(
+                  preset: preset,
+                  selected: selected == preset,
+                  onTap: () => onApply(preset),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnimationStyleCard extends StatelessWidget {
+  const _AnimationStyleCard({
+    required this.preset,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final MotionPreset preset;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? StudioColors.paleGreen : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: selected ? StudioColors.green : StudioColors.border,
+          width: selected ? 1.6 : 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 120,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              children: [
+                Icon(
+                  _presetIcon(preset),
+                  size: 18,
+                  color: selected ? StudioColors.green : StudioColors.muted,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        preset.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: StudioColors.ink,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        preset.tagline,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: StudioColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

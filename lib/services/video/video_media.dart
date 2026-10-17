@@ -114,23 +114,44 @@ class ClipManifest {
 }
 
 /// An imported, managed background clip.
+///
+/// Native platforms read JPEG frames from [directory] on disk; the browser has
+/// no filesystem, so it supplies [frameReader] backed by in-memory frames.
 class ImportedClip {
   const ImportedClip({
     required this.manifest,
-    required this.directory,
+    this.directory = '',
+    this.frameReader,
   });
 
   final ClipManifest manifest;
 
-  /// Absolute directory that holds the frames. Not persisted.
+  /// Absolute directory that holds the frames. Empty on the web build.
   final String directory;
+
+  /// Returns the encoded bytes of frame [index]. `null` reads [framePath].
+  final Future<Uint8List> Function(int index)? frameReader;
 
   String framePath(int index) =>
       '$directory/${manifest.frameName(index)}';
 
+  Future<Uint8List> readFrame(int index) {
+    final reader = frameReader;
+    if (reader != null) return reader(index);
+    return File(framePath(index)).readAsBytes();
+  }
+
   int get frameCount => manifest.frameCount;
   int get fps => manifest.fps;
   int get durationMs => manifest.proxyDurationMs;
+}
+
+/// A freshly imported clip: its manifest plus a ready-to-render reference.
+class ClipImportResult {
+  const ClipImportResult({required this.manifest, required this.clip});
+
+  final ClipManifest manifest;
+  final ImportedClip clip;
 }
 
 /// A managed music file.
@@ -380,6 +401,57 @@ class VideoMediaStore {
       return 0;
     }
   }
+}
+
+/// Platform media service: import and managed storage for background clips and
+/// music.
+///
+/// Native builds keep media on disk next to the drafts; the browser keeps clips
+/// in memory for the session only. Obtain the active implementation from
+/// `createVideoMediaService()` (see `video_media_platform.dart`).
+abstract class VideoMediaService {
+  /// Whether background-video import is available on this platform.
+  bool get isSupported;
+
+  /// Whether music import is available. False on the web, whose export is
+  /// silent.
+  bool get isMusicSupported;
+
+  Future<VideoProbe> probeVideo(String sourcePath);
+
+  Future<ClipImportResult> extractClip({
+    required String sourcePath,
+    required String title,
+    required String projectId,
+    required String assetId,
+    void Function(int done, int total)? onProgress,
+  });
+
+  Future<void> cancelExtraction();
+
+  Future<ImportedClip?> loadClip(String projectId, String assetId);
+
+  Future<ImportedAudio?> loadAudio(
+    String projectId,
+    String assetId, {
+    String? title,
+    int? durationMs,
+  });
+
+  Future<void> deleteClip(String projectId, String assetId);
+
+  Future<int> projectBytes(String projectId);
+
+  Future<int> probeAudioDuration(String sourcePath);
+
+  Future<ImportedAudio?> importMusic({
+    required String sourcePath,
+    required String fileName,
+    required String projectId,
+    required String assetId,
+  });
+
+  Future<void> deleteAudio(ImportedAudio audio);
 }
 
 /// Human-readable byte size (shared with the export sheet).

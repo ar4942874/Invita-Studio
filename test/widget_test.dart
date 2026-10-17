@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:invitation_studio/app.dart';
 import 'package:invitation_studio/application/studio_controller.dart';
 import 'package:invitation_studio/domain/project.dart';
+import 'package:invitation_studio/domain/video/timeline.dart';
 import 'package:invitation_studio/services/bundled_fonts.dart'
     show loadStudioFonts;
 import 'package:invitation_studio/services/draft_store.dart';
@@ -138,4 +139,32 @@ void main() {
       await tester.pump();
     },
   );
+  testWidgets('video mode applies a whole-card preset in one tap', (
+    tester,
+  ) async {
+    final studio = await mount(tester, const Size(1440, 1000));
+    await tester.tap(find.text('Video'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Animation'), findsOneWidget);
+    expect(studio.video.motions, isEmpty);
+
+    await tester.tap(find.text('Rise up'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 32));
+
+    expect(studio.video.enabled, isTrue);
+    expect(studio.video.motions.keys, containsAll(studio.project.layerIds));
+    expect(
+      studio.video.motions.values.every(
+        (motion) => motion.entrance.effect == MotionEffect.slideUp,
+      ),
+      isTrue,
+    );
+    // Let the debounced autosave fire so no timer outlives the test.
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+  });
 }

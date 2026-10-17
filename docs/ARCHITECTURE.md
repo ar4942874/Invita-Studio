@@ -17,8 +17,10 @@ The host is a Flutter application with a `ChangeNotifier` coordinator. No second
 | `lib/domain/project.dart` | Versioned project envelope (schema 2), v1 migration, guarded JSON import, effective video view |
 | `lib/domain/video/timeline.dart` | Flutter-free video model: duration, background clip, layer windows/effects, music, deterministic evaluation |
 | `lib/services/video/frame_renderer.dart` | Shared preview/export painter, clipped background-frame LRU, export frame feed |
-| `lib/services/video/video_media.dart` | Managed media storage, clip manifests, native probe/extraction channel |
-| `lib/services/video/video_encoder.dart` | Encoder spec/session interface and the native `invita/video_export` backend |
+| `lib/services/video/video_media.dart` | Managed media storage, clip manifests, native probe/extraction channel and the `VideoMediaService` interface |
+| `lib/services/video/video_media_platform.dart` | Conditional native/browser `VideoMediaService` factory |
+| `lib/services/video/video_encoder.dart` | Encoder spec/session interface (`EncodedVideo` result) and the native `invita/video_export` backend |
+| `lib/services/video/video_encoder_platform.dart` | Conditional native/browser `VideoEncoderBackend` factory (`MediaRecorder` on the web) |
 | `lib/services/video/video_export_service.dart` | Frozen-snapshot exporter, progress, cancellation, temp cleanup |
 | `lib/ui/video/` | Video workspace, preview, transport, settings sheet and MP4 export dialog |
 | `lib/application/studio_controller.dart` | Serialized host edits, two-way field state, reflow, styling, layer actions, drafts and save status |
@@ -81,6 +83,8 @@ Video mode is a second **view over the same document**, not a second project. `S
 
 `VideoTimeline` is deliberately Flutter-free and versioned. `evaluateTimeline(timeline, layerIds, timeMs)` is the only animation evaluator; it returns opacity, offset and uniform scale per layer. The same function feeds the live preview and the exporter. Entrance effects settle at their neutral value; exits run the same effect away from it. Layers without an entry are visible for the whole timeline.
 
+`MotionPreset` (same file) sits above that model: the layman UI applies a named whole-card style (`rise`, `zoomIn`, `zoomOut`, `stagger`, `none`) and the preset method expands it into ordinary per-layer `LayerMotion` values. Because it only writes the shared model, neither the preview nor the exporter knows presets exist. `MotionPreset.detect` compares a timeline back to each preset so the gallery can show which style is active.
+
 `TimelineFrameRenderer.paintFrame` is shared by the preview (`VideoFramePainter`) and the exporter (`renderImage` → raw RGBA):
 
 1. the background node (bundled artwork and its colour),
@@ -95,14 +99,18 @@ Export timestamps are `frameIndex * 1e6 ~/ fps`; wall-clock playback is confined
 
 ### Native services
 
-Two platform channels sit behind plain Dart interfaces:
+Two platform channels sit behind plain Dart interfaces, and both are reached
+through conditional factories so the browser uses a pure-Dart implementation
+instead:
 
-* `invita/video_media` — probe video/audio, extract a bounded JPEG proxy sequence (≤900 frames, ≤1080×1920) with progress and cancellation.
-* `invita/video_export` — open a session, `addFrame` (RGBA8888 + timestamp), `finish`, `cancel`.
+* `invita/video_media` — probe video/audio, extract a bounded JPEG proxy sequence (≤900 frames, ≤1080×1920) with progress and cancellation. `VideoMediaService` (`createVideoMediaService()`) wraps it and the managed store.
+* `invita/video_export` — open a session, `addFrame` (RGBA8888 + timestamp), `finish`, `cancel`. `finish` returns an `EncodedVideo` (path + byte count) so the browser backend can hand back a downloaded blob instead of a file path.
 
-Android implements the encoder with `MediaCodec`/`MediaMuxer` (H.264 Baseline preferred, AAC-LC 128 kb/s) and applies music trim/gain/fades while decoding to PCM. iOS uses `AVAssetWriter` and, for music, an `AVMutableComposition` second pass with passthrough when no gain/fade is needed. Web/desktop have no encoder: `isVideoExportSupported` is false and the dialog explains that only preview/editing is available.
+Android implements the encoder with `MediaCodec`/`MediaMuxer` (H.264 Baseline preferred, AAC-LC 128 kb/s) and applies music trim/gain/fades while decoding to PCM. iOS uses `AVAssetWriter` and, for music, an `AVMutableComposition` second pass with passthrough when no gain/fade is needed. Desktop has no encoder: `isVideoExportSupported` is false and the dialog explains that only preview/editing is available.
 
-Imported media lives under `<documents>/InvitaStudioMedia/<projectId>/` with a JSON manifest per clip. Project JSON stores IDs and trims only, so projects stay small; the trade-off is that portable JSON does not carry media and must be relinked. Missing media is a first-class state in the preview and settings sheet.
+On the web, `video_encoder_web.dart` records the rendered canvas through `MediaRecorder` (silent WebM/MP4) and downloads it via `saveBytes`, and `video_media_service_web.dart` decodes a picked clip into in-memory PNG frames for the session (`ImportedClip.frameReader`). `VideoExporter` guards the temp file, rename and audio muxing with `kIsWeb`.
+
+Imported media lives under `<documents>/InvitaStudioMedia/<projectId>/` with a JSON manifest per clip. Project JSON stores IDs and trims only, so projects stay small; the trade-off is that portable JSON does not carry media and must be relinked, and browser imports are not persisted at all. Missing media is a first-class state in the preview and settings sheet.
 
 ## Native integration boundary
 

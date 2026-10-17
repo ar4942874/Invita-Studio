@@ -1,5 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
+/// A finished encode: where it lives and how big it is.
+///
+/// Native backends return an absolute file path; the browser backend returns a
+/// suggested file name (the bytes are handed to the download helper instead).
+class EncodedVideo {
+  const EncodedVideo({required this.path, required this.bytes});
+  final String path;
+  final int bytes;
+}
 
 /// Audio settings handed to the native muxer with the video track.
 class EncoderAudioSpec {
@@ -78,7 +90,7 @@ class VideoEncodeSpec {
 /// One open encoder session. Frames are RGBA8888 in document resolution.
 abstract class VideoEncoderSession {
   Future<void> addFrame(Uint8List rgba, int timestampUs);
-  Future<String> finish();
+  Future<EncodedVideo> finish();
   Future<void> cancel();
 }
 
@@ -149,7 +161,7 @@ class _NativeSession implements VideoEncoderSession {
   }
 
   @override
-  Future<String> finish() async {
+  Future<EncodedVideo> finish() async {
     if (_closed) throw StateError('Encoder session is closed.');
     _closed = true;
     final path = await _channel.invokeMethod<String>('finish', {
@@ -158,7 +170,8 @@ class _NativeSession implements VideoEncoderSession {
     if (path == null || path.isEmpty) {
       throw StateError('The encoder did not produce a file.');
     }
-    return path;
+    final bytes = await File(path).length();
+    return EncodedVideo(path: path, bytes: bytes);
   }
 
   @override

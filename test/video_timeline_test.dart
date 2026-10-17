@@ -287,4 +287,105 @@ void main() {
       expect(decoded.motions, isEmpty);
     });
   });
+
+  group('MotionPreset', () {
+    const ids = ['header', 'first', 'second'];
+
+    test('none writes a static card and matches an empty timeline', () {
+      final built = MotionPreset.none.build(layerIds: ids, durationMs: 15000);
+      expect(built, isEmpty);
+      expect(
+        MotionPreset.none.matches(
+          layerIds: ids,
+          durationMs: 15000,
+          motions: const {},
+        ),
+        isTrue,
+      );
+    });
+
+    test('rise, zoomIn and zoomOut animate every layer with a full window', () {
+      Map<String, MotionEffect> effectsFor(MotionPreset preset) {
+        final built = preset.build(layerIds: ids, durationMs: 15000);
+        expect(built.keys, containsAll(ids));
+        return {
+          for (final entry in built.entries) entry.key: entry.value.entrance.effect,
+        };
+      }
+
+      expect(effectsFor(MotionPreset.rise)['first'], MotionEffect.slideUp);
+      expect(effectsFor(MotionPreset.zoomIn)['first'], MotionEffect.zoomIn);
+      expect(effectsFor(MotionPreset.zoomOut)['first'], MotionEffect.zoomOut);
+
+      final layer = MotionPreset.rise
+          .build(layerIds: ids, durationMs: 15000)['first']!;
+      expect(layer.visibleStartMs, 0);
+      expect(layer.visibleEndMs, 15000);
+      expect(layer.exit.isAnimated, isFalse);
+    });
+
+    test('stagger delays increase and stay inside the card and delay limit', () {
+      final built = MotionPreset.stagger.build(layerIds: ids, durationMs: 15000);
+      final delays = [for (final id in ids) built[id]!.entrance.delayMs];
+      expect(delays[0], 0);
+      expect(delays[1], greaterThan(delays[0]));
+      expect(delays[2], greaterThan(delays[1]));
+      expect(delays[2], lessThanOrEqualTo(10000));
+      for (final id in ids) {
+        final entrance = built[id]!.entrance;
+        expect(
+          entrance.delayMs + entrance.durationMs,
+          lessThanOrEqualTo(15000),
+        );
+      }
+    });
+
+    test('built presets satisfy timeline validation', () {
+      for (final preset in MotionPreset.values) {
+        final timeline = VideoTimeline(
+          enabled: true,
+          durationMs: 15000,
+          motions: preset.build(layerIds: ids, durationMs: 15000),
+        );
+        expect(
+          timeline.validate(layerIds: ids.toSet()),
+          isEmpty,
+          reason: '${preset.wireName} should validate',
+        );
+      }
+    });
+
+    test('detect round-trips every preset and rejects a custom edit', () {
+      for (final preset in MotionPreset.values) {
+        final motions = preset.build(layerIds: ids, durationMs: 15000);
+        expect(
+          MotionPreset.detect(
+            layerIds: ids,
+            durationMs: 15000,
+            motions: motions,
+          ),
+          preset,
+        );
+      }
+      final custom = MotionPreset.rise.build(layerIds: ids, durationMs: 15000);
+      custom['first'] = custom['first']!.copyWith(
+        entrance: custom['first']!.entrance.copyWith(durationMs: 1200),
+      );
+      expect(
+        MotionPreset.detect(layerIds: ids, durationMs: 15000, motions: custom),
+        isNull,
+      );
+    });
+
+    test('preset motions survive a JSON round-trip', () {
+      final timeline = VideoTimeline(
+        enabled: true,
+        durationMs: 12000,
+        motions: MotionPreset.stagger.build(layerIds: ids, durationMs: 12000),
+      );
+      final decoded = VideoTimeline.decode(timeline.toJson());
+      expect(decoded.motions, hasLength(ids.length));
+      expect(decoded.motions['second']!.entrance.effect, MotionEffect.slideUp);
+    });
+  });
 }

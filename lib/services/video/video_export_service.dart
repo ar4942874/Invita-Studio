@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../domain/video/timeline.dart';
 import 'frame_renderer.dart';
 import 'video_encoder.dart';
+import 'video_encoder_platform.dart';
 import 'video_media.dart';
 
 enum VideoExportStage {
@@ -220,15 +221,23 @@ class VideoExporter {
       }
     }
 
-    final tempDir = Directory(
-      '${(await _tempDirectory()).path}/invita-video-exports',
-    );
-    if (!await tempDir.exists()) await tempDir.create(recursive: true);
     final fileName = '${_slug(request.title)}-${_stamp(started)}.mp4';
-    final tempFile = File('${tempDir.path}/$fileName');
-    if (await tempFile.exists()) await tempFile.delete();
 
-    final audioSource = timeline.audio == null || timeline.audio!.isMuted
+    // The browser backend records and downloads the artefact itself, so no
+    // native temp directory or file is created there.
+    File? tempFile;
+    if (!kIsWeb) {
+      final tempDir = Directory(
+        '${(await _tempDirectory()).path}/invita-video-exports',
+      );
+      if (!await tempDir.exists()) await tempDir.create(recursive: true);
+      tempFile = File('${tempDir.path}/$fileName');
+      if (await tempFile.exists()) await tempFile.delete();
+    }
+
+    // Browsers record a silent video; audio muxing stays native-only.
+    final audioSource =
+        kIsWeb || timeline.audio == null || timeline.audio!.isMuted
         ? null
         : request.audio;
     final encoderAudio = audioSource == null
@@ -259,7 +268,7 @@ class VideoExporter {
     try {
       session = await request.backend.open(
         VideoEncodeSpec(
-          outputPath: tempFile.path,
+          outputPath: tempFile?.path ?? fileName,
           width: outputWidth,
           height: outputHeight,
           fps: timeline.fps,
@@ -313,22 +322,36 @@ class VideoExporter {
           stage: VideoExportStage.finishing,
           frame: totalFrames,
           frameCount: totalFrames,
-          message: encoderAudio == null ? 'Writing silent MP4' : 'Muxing AAC audio',
+          message: kIsWeb
+              ? 'Finalising video'
+              : encoderAudio == null
+              ? 'Writing silent MP4'
+              : 'Muxing AAC audio',
         ),
       );
-      final encodedPath = await session.finish();
-      final encoded = File(encodedPath);
-      if (!await encoded.exists() || await encoded.length() < 1024) {
+      final encoded = await session.finish();
+      var resultPath = encoded.path;
+      var resultBytes = encoded.bytes;
+      if (!kIsWeb) {
+        final encodedFile = File(encoded.path);
+        if (!await encodedFile.exists() || encoded.bytes < 1024) {
+          throw const VideoExportException(
+            'The encoder finished without writing a usable MP4.',
+          );
+        }
+        final exportsDir = Directory(
+          '${(await _documentsDirectory()).path}/InvitaStudioExports',
+        );
+        if (!await exportsDir.exists()) await exportsDir.create(recursive: true);
+        final finalFile = File('${exportsDir.path}/$fileName');
+        await encodedFile.rename(finalFile.path);
+        resultPath = finalFile.path;
+        resultBytes = await finalFile.length();
+      } else if (encoded.bytes < 1024) {
         throw const VideoExportException(
-          'The encoder finished without writing a usable MP4.',
+          'The encoder finished without producing a usable video.',
         );
       }
-      final exportsDir = Directory(
-        '${(await _documentsDirectory()).path}/InvitaStudioExports',
-      );
-      if (!await exportsDir.exists()) await exportsDir.create(recursive: true);
-      final finalFile = File('${exportsDir.path}/$fileName');
-      await encoded.rename(finalFile.path);
       succeeded = true;
       onProgress(
         VideoExportProgress(
@@ -338,14 +361,14 @@ class VideoExporter {
         ),
       );
       return VideoExportResult(
-        path: finalFile.path,
-        bytes: await finalFile.length(),
+        path: resultPath,
+        bytes: resultBytes,
         width: outputWidth,
         height: outputHeight,
         durationMs: timeline.durationMs,
         fps: timeline.fps,
         frameCount: totalFrames,
-        hasAudio: encoderAudio != null,
+        hasAudio: !kIsWeb && encoderAudio != null,
         elapsed: DateTime.now().difference(started),
       );
     } catch (error) {
@@ -356,7 +379,9 @@ class VideoExporter {
           // Best-effort; the partial file is removed below.
         }
         try {
-          if (await tempFile.exists()) await tempFile.delete();
+          if (tempFile != null && await tempFile.exists()) {
+            await tempFile.delete();
+          }
         } catch (_) {
           // Best-effort cleanup.
         }
@@ -394,7 +419,4 @@ class VideoExporter {
 }
 
 /// Convenience for tests and the UI: is this build able to encode?
-bool get isVideoExportSupported =>
-    !kIsWeb &&
-    (defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS);
+bool get isVideoExportSupported => createVideoEncoderBackend().isSupported;

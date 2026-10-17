@@ -1,11 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../application/studio_controller.dart';
 import '../../domain/video/timeline.dart';
 import '../../services/video/video_encoder.dart';
+import '../../services/video/video_encoder_platform.dart';
 import '../../services/video/video_export_service.dart';
 import '../../services/video/video_media.dart';
+import '../../services/video/video_media_platform.dart';
 import '../studio_theme.dart';
 
 enum VideoQuality {
@@ -91,7 +94,7 @@ class _QualityRow extends StatelessWidget {
 }
 
 class _VideoExportDialogState extends State<VideoExportDialog> {
-  final VideoMediaStore _store = VideoMediaStore();
+  final VideoMediaService _store = createVideoMediaService();
   late final VideoEncoderBackend _backend;
   late final VideoExporter _exporter;
   VideoQuality _quality = VideoQuality.full;
@@ -105,7 +108,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
   @override
   void initState() {
     super.initState();
-    _backend = widget.backend ?? NativeVideoEncoderBackend();
+    _backend = widget.backend ?? createVideoEncoderBackend();
     _exporter = widget.exporter ?? VideoExporter();
   }
 
@@ -284,13 +287,15 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.check_circle_outline, size: 16, color: StudioColors.green),
-                          SizedBox(width: 6),
+                          const Icon(Icons.check_circle_outline, size: 16, color: StudioColors.green),
+                          const SizedBox(width: 6),
                           Text(
-                            'MP4 written to this device',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            kIsWeb
+                                ? 'Video downloaded to your device'
+                                : 'MP4 written to this device',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -304,6 +309,8 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
                       Text(
                         result.hasAudio
                             ? 'Audio: AAC music track'
+                            : kIsWeb
+                            ? 'Audio: none (browser export is silent)'
                             : 'Audio: none (silent MP4)',
                         style: const TextStyle(fontSize: 10.5, color: StudioColors.muted),
                       ),
@@ -334,11 +341,13 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
                       child: const Text('Cancel export'),
                     )
                   else if (result != null) ...[
-                    OutlinedButton(
-                      onPressed: () => _share(result),
-                      child: const Text('Share .mp4'),
-                    ),
-                    const SizedBox(width: 8),
+                    if (!kIsWeb) ...[
+                      OutlinedButton(
+                        onPressed: () => _share(result),
+                        child: const Text('Share .mp4'),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     FilledButton(
                       onPressed: () => Navigator.of(context).pop(),
                       child: const Text('Done'),
@@ -352,7 +361,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
                     FilledButton.icon(
                       onPressed: supported ? _start : null,
                       icon: const Icon(Icons.movie_creation_outlined, size: 16),
-                      label: const Text('Export MP4'),
+                      label: Text(kIsWeb ? 'Export video' : 'Export MP4'),
                     ),
                   ],
                 ],
@@ -373,6 +382,12 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
   }
 
   Widget _audioLine(VideoTimeline timeline) {
+    if (kIsWeb) {
+      return const Text(
+        'Audio: browser export is silent (preview still plays the music)',
+        style: TextStyle(fontSize: 11, color: StudioColors.muted),
+      );
+    }
     final audio = timeline.audio;
     if (audio == null) {
       return const Text(

@@ -57,7 +57,7 @@ class _VideoPreviewState extends State<VideoPreview> {
   ImportedClip? _clip;
   ui.Image? _background;
   int _revision = 0;
-  bool _loadingImages = true;
+  bool _loadingImages = false;
   ui.Size _paintSize = ui.Size.zero;
 
   @override

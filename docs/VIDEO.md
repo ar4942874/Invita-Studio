@@ -11,7 +11,8 @@ the build environment, and what still requires real devices.
 | Shared content | Image and video modes edit **one** `StudioController` / `DesignDocument`. Wording, fonts, colours and layer positions are the same objects; switching modes never copies or re-flows the document. |
 | Timeline model | `lib/domain/video/timeline.dart`: versioned `VideoTimeline` with duration (5–30 s), fixed 30 fps, background clip settings, per-layer `LayerMotion` (visible window, entrance, exit), and one optional music track. |
 | Animation | `fade`, `slideUp/Down/Left/Right`, `zoomIn/zoomOut` with duration 100–3000 ms, delay, and four easings. `evaluateTimeline` is the single evaluator used by both preview and export. |
-| Preview | Play/pause, scrubbing, timecode, ruler, layer tracks, playhead and an inspector for window/effect/duration/easing. Frame painting goes through `TimelineFrameRenderer`. |
+| Card presets | `MotionPreset` in `lib/domain/video/timeline.dart` gives a layman one-tap, whole-card styles — `rise`, `zoomIn`, `zoomOut` and `stagger` (plus `none`). Each writes ordinary per-layer motions, so preview and export need no special case, and `MotionPreset.detect` re-highlights the style a timeline currently matches. |
+| Preview | Play/pause, scrubbing, timecode, ruler, layer tracks and playhead. The default workspace shows a preset strip so a non-technical user just taps a style; a `Customize` toggle reveals the per-layer inspector for window/effect/duration/easing. Frame painting goes through `TimelineFrameRenderer`. |
 | Export | `VideoExporter` freezes the document + timeline, renders each frame offscreen, and streams raw RGBA to a native encoder through `VideoEncoderBackend`. Frames are never queued in memory. |
 | Native encoders | Android `MediaCodec`/`MediaMuxer` (H.264 + AAC) and iOS `AVAssetWriter` (H.264, audio muxed in a second pass). Both are registered in `MainActivity.kt` / `AppDelegate.swift`. |
 | Media storage | Imported clips and music live in managed app storage; project JSON stores asset IDs and trims only. Missing media is detected and explained instead of crashing. |
@@ -151,15 +152,37 @@ Neither backend is compiled in this environment; see the verification section.
 
 ## Platform matrix
 
-| Platform | Preview + timeline editing | Background-clip import | MP4 export |
+| Platform | Preview + timeline editing | Background-clip import | Video export |
 |---|---|---|---|
-| Android 7+ (minSdk 24) | yes | yes (native) | yes (native encoder) |
-| iOS 15+ | yes | yes (native) | yes (native encoder) |
-| Web | yes (artwork, animations, scrubbing) | no — message shown | no — dialog explains the encoder is unavailable |
-| Desktop | yes (artwork, animations, scrubbing) | no | no |
+| Android 7+ (minSdk 24) | yes | yes (native, on disk) | yes (native H.264 + AAC MP4) |
+| iOS 15+ | yes | yes (native, on disk) | yes (native H.264 + AAC MP4) |
+| Web | yes | yes — decoded in memory for the session, not persisted | yes — `MediaRecorder` downloads WebM/MP4, always silent |
+| Desktop | yes (artwork, animations, scrubbing) | no | no — dialog explains the encoder is unavailable |
 
-Web/desktop never pretend to export: `isVideoExportSupported` gates the action
-and the dialog explains that preview and timing still work.
+Desktop never pretends to export: `isVideoExportSupported` gates the action and
+the dialog explains that preview and timing still work.
+
+## Web build (browser)
+
+The browser has no filesystem and no platform codec plugins, so two seams are
+swapped behind conditional imports:
+
+* **Export** — `video_encoder_platform.dart` selects
+  `video_encoder_web.dart`, which records the rendered canvas through
+  `MediaRecorder` over `canvas.captureStream(0)` + `requestFrame()` paced to real
+  time. `VideoExporter` skips the temp file, `rename` and audio muxing on the web
+  (`kIsWeb` guards) and downloads the resulting blob through `saveBytes`
+  (File System Access API → `window.open` → anchor fallback). Output is WebM on
+  Chromium/Firefox and MP4 on Safari/newer Chromium, and is **always silent**.
+* **Background-clip import** — `video_media_platform.dart` selects
+  `video_media_service_web.dart`, which probes a picked file with a `<video>`
+  element and extracts downscaled frames (seek + `drawImage` + PNG encode),
+  holding them in memory for the session. Reloading the page loses them; the
+  draft then reports the clip as missing and the settings sheet offers re-import.
+  Music import is disabled on the web (browser export is silent).
+
+`ImportedClip.readFrame` abstracts the frame source: native reads JPEG files
+from the managed directory, the browser returns in-memory PNG bytes.
 
 ## Verification
 
@@ -174,6 +197,7 @@ and the dialog explains that preview and timing still work.
 | Project JSON round-trip / v1 migration / validation tests | `test/video_project_test.dart` — pass on Flutter 3.47.7 / Dart 3.13.5 |
 | Timeline evaluation, easing, frame-index tests | `test/video_timeline_test.dart` — pass |
 | Media/manifest/frame-mapping/progress tests | `test/video_media_test.dart` — pass |
+| Full suite (86 tests), web export/import wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
 
 ### Not executed (blockers)
 
@@ -212,7 +236,10 @@ builds or that the native plugins ran.
   as such.
 * Background video is converted to a JPEG proxy sequence at import time (bounded
   to 900 frames), so animation inside the clip is previewed at 30 fps from the
-  proxy. Device storage use is shown in the settings sheet.
+  proxy. Device storage use is shown in the settings sheet. On the web the proxy
+  is decoded into memory for the session only (no persistence) and exported
+  video stays silent; the browser build targets current Chrome, Edge, Firefox and
+  Safari.
 * Text animation supports opacity, translation and uniform scale only — no
   rotation, blur, masks or per-word effects.
 * The export dialog's "Lighter file" option changes resolution and bitrate, not

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:invitation_studio/domain/video/timeline.dart';
@@ -141,5 +142,22 @@ void main() {
     expect(formatBytes(900), '900 B');
     expect(formatBytes(2048), '2 KB');
     expect(formatBytes(3 * 1024 * 1024), '3.0 MB');
+  });
+
+  test('imported clip reads frames through an in-memory reader', () async {
+    final manifest = _manifest(frames: 3);
+    final frames = [
+      Uint8List.fromList([1, 2, 3]),
+      Uint8List.fromList([4, 5]),
+      Uint8List.fromList([6]),
+    ];
+    final clip = ImportedClip(
+      manifest: manifest,
+      frameReader: (index) async => frames[index],
+    );
+    expect(clip.directory, isEmpty);
+    expect(await clip.readFrame(0), frames[0]);
+    expect(await clip.readFrame(2), frames[2]);
+    expect(clip.frameCount, 3);
   });
 }

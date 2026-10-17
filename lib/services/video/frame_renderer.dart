@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -47,8 +46,7 @@ class ClipFrameCache {
     }
     return _pending.putIfAbsent(clamped, () async {
       try {
-        final file = File(clip.framePath(clamped));
-        final bytes = await file.readAsBytes();
+        final bytes = await clip.readFrame(clamped);
         final codec = await ui.instantiateImageCodec(
           bytes,
           targetWidth: decodeWidth,
