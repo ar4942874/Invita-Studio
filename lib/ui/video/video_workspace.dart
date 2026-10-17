@@ -178,6 +178,12 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
         ambient: preset.ambient,
       ),
     );
+    // Respect the OS/browser "reduce motion" setting: show the settled frame
+    // instead of auto-playing. The Play button still works when pressed.
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _playback.seek(widget.studio.video.settledTimeMs);
+      return;
+    }
     _playback.seek(0);
     _playback.play();
   }

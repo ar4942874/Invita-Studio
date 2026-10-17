@@ -167,4 +167,32 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
   });
+  testWidgets('reduce motion settles the preview instead of auto-playing', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(
+      tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+    );
+    final studio = await mount(tester, const Size(1440, 1000));
+    await tester.tap(find.text('Video'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('Rise up'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 32));
+
+    expect(studio.video.enabled, isTrue);
+    expect(studio.video.motions, isNotEmpty);
+    // The preset applied but playback stayed idle at the settled frame.
+    expect(find.byTooltip('Play'), findsOneWidget);
+    expect(find.byTooltip('Pause'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+  });
 }

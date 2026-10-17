@@ -7,6 +7,7 @@
 - Bundled a short generated tune per category and pre-select it when a project is created.
 - Added real browser video export through `MediaRecorder` (silent WebM/MP4), alongside the native H.264/AAC encoders.
 - Video edits (length, trim, fades, volume, per-layer motion) now share the same undo/redo history as image edits, with a slider drag coalesced into a single step.
+- Honored the OS/browser "reduce motion" setting: applying an animation preset settles on the final frame instead of auto-playing.
 - `flutter analyze` clean and the full test suite green on Flutter 3.47.7 / Dart 3.13.5.
 
 # 1.0.0 — image-first implementation
