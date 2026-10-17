@@ -37,8 +37,10 @@ class StudioController extends ChangeNotifier {
         }
         return AssetImage(asset!);
       },
+      onDocumentChanged: _onCommittedDocument,
     );
     _lastDocument = project.document;
+    _committedDocument = project.document;
     _subscription = editor.stateStream.listen((state) {
       if (_disposed) return;
       if (state.document != _lastDocument) {
@@ -81,6 +83,21 @@ class StudioController extends ChangeNotifier {
   StudioProject _project;
   List<StudioProject> _drafts;
   late DesignDocument _lastDocument;
+
+  /// Last committed document. Used as the "before" side of a document history
+  /// entry, because the engine reports commits with the new document.
+  late DesignDocument _committedDocument;
+
+  /// Unified undo/redo for image *and* video edits, in the order they happened.
+  /// Document steps are restored through the engine; video steps from the
+  /// stored timeline snapshots. Only [Cursor] entries are undoable.
+  final List<_HistoryEntry> _history = [];
+  int _cursor = 0;
+  static const _maxHistory = 80;
+
+  /// Snapshot taken when a slider drag starts, so the whole drag is one step.
+  VideoTimeline? _videoSession;
+  bool _resettingHistory = false;
   final Map<String, String> _pendingFields = {};
   Future<void> _queue = Future.value();
   Future<void> _saveQueue = Future.value();
@@ -103,12 +120,70 @@ class StudioController extends ChangeNotifier {
 
   /// Replaces the video timeline and schedules the usual debounced autosave.
   /// Export always reads a frozen copy, so this is safe during export.
+  ///
+  /// The change joins the same undo history as image edits. Wrap a slider drag
+  /// with [beginVideoSession]/[endVideoSession] so the whole drag is one step.
   void updateVideo(VideoTimeline value) {
     if (_disposed) return;
+    final before = _project.video;
     _project = _project.copyWith(video: value);
+    if (_videoSession == null) _recordVideo(before, value);
     _upsert(_project);
     _scheduleSave();
     notifyListeners();
+  }
+
+  /// Starts coalescing a run of [updateVideo] calls (e.g. a slider drag) into
+  /// one undo step.
+  void beginVideoSession() {
+    _videoSession ??= _project.video;
+  }
+
+  /// Ends a [beginVideoSession] and records one undo step if anything changed.
+  void endVideoSession() {
+    final before = _videoSession;
+    _videoSession = null;
+    if (before != null) _recordVideo(before, _project.video);
+  }
+
+  void _recordVideo(VideoTimeline before, VideoTimeline after) {
+    if (before == after) return;
+    _truncateRedo();
+    _history.add(_HistoryEntry(isVideo: true, before: before, after: after));
+    _cursor = _history.length;
+    _trimHistory();
+  }
+
+  void _truncateRedo() {
+    if (_cursor < _history.length) {
+      _history.removeRange(_cursor, _history.length);
+    }
+  }
+
+  void _trimHistory() {
+    if (_history.length > _maxHistory) {
+      _history.removeRange(0, _history.length - _maxHistory);
+      _cursor = _history.length;
+    }
+  }
+
+  /// Called by the engine on every committed document change (gesture end,
+  /// add/delete, history session commit). Not called mid-drag, so the entry is
+  /// one per user action. Restoring history uses `recordUndo: false`, which
+  /// never triggers this, so no re-entrancy guard is needed.
+  void _onCommittedDocument(DesignDocument document) {
+    if (_disposed || _resettingHistory) {
+      _committedDocument = document;
+      return;
+    }
+    if (document == _committedDocument) return;
+    _truncateRedo();
+    _history.add(
+      _HistoryEntry(isVideo: false, before: _committedDocument, after: document),
+    );
+    _cursor = _history.length;
+    _trimHistory();
+    _committedDocument = document;
   }
   DesignDocument get document => editor.document;
   InvitationTemplate get template => templateFor(document);
@@ -116,8 +191,8 @@ class StudioController extends ChangeNotifier {
   TextNode? get selectedText => editor.state.selectedNode is TextNode
       ? editor.state.selectedNode as TextNode
       : null;
-  bool get canUndo => editor.state.canUndo;
-  bool get canRedo => editor.state.canRedo;
+  bool get canUndo => _cursor > 0;
+  bool get canRedo => _cursor < _history.length;
   int get layerCount => document.nodes.whereType<TextNode>().length;
   DesignNode? get selectedNode => editor.state.selectedNode;
   ImageNode? get selectedPhoto => selectedNode is ImageNode
@@ -174,13 +249,33 @@ class StudioController extends ChangeNotifier {
   }
 
   Future<void> undo() => _enqueue(() async {
-    editor.undo();
-    await Future<void>.delayed(Duration.zero);
+    if (_cursor == 0) return;
+    final entry = _history[--_cursor];
+    await _restoreHistory(entry.before);
+    if (!_disposed) notifyListeners();
   });
   Future<void> redo() => _enqueue(() async {
-    editor.redo();
-    await Future<void>.delayed(Duration.zero);
+    if (_cursor >= _history.length) return;
+    final entry = _history[_cursor++];
+    await _restoreHistory(entry.after);
+    if (!_disposed) notifyListeners();
   });
+
+  /// Restores one side of a history entry (the "before" on undo, the "after" on
+  /// redo), whether it holds a document or a video timeline.
+  Future<void> _restoreHistory(Object? value) async {
+    if (value is VideoTimeline) {
+      _project = _project.copyWith(video: value);
+      _upsert(_project);
+      _scheduleSave();
+      return;
+    }
+    if (value is DesignDocument) {
+      await editor.applyDocument(value, recordUndo: false);
+      _committedDocument = value;
+      await Future<void>.delayed(Duration.zero);
+    }
+  }
 
   Future<void> chooseTemplate(InvitationTemplate target) =>
       _reflow(target, format);
@@ -618,8 +713,14 @@ class StudioController extends ChangeNotifier {
     await saveNow();
     _project = project;
     _pendingFields.clear();
+    _resettingHistory = true;
+    _videoSession = null;
     editor.loadDocument(project.document);
     await Future<void>.delayed(Duration.zero);
+    _history.clear();
+    _cursor = 0;
+    _committedDocument = project.document;
+    _resettingHistory = false;
     _upsert(project);
     _scheduleSave();
     notifyListeners();
@@ -747,4 +848,18 @@ class StudioController extends ChangeNotifier {
     editor.dispose();
     super.dispose();
   }
+}
+
+/// One undoable step: a document change or a video-timeline change, holding the
+/// state on either side so both modes share a single history.
+class _HistoryEntry {
+  const _HistoryEntry({
+    required this.isVideo,
+    required this.before,
+    required this.after,
+  });
+
+  final bool isVideo;
+  final Object? before;
+  final Object? after;
 }

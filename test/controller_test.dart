@@ -93,6 +93,46 @@ void main() {
     await studio.flush();
     expect(studio.document, before);
   });
+  test('video edits join the image undo history in order', () async {
+    final beforeField = studio.fieldValue('first');
+    final beforeVideo = studio.video;
+    await studio.setField('first', 'Zara');
+    await studio.flush();
+    studio.updateVideo(beforeVideo.copyWith(durationMs: 20000));
+    await studio.flush();
+    expect(studio.video.durationMs, 20000);
+
+    await studio.undo();
+    await studio.flush();
+    expect(studio.video.durationMs, beforeVideo.durationMs);
+    expect(studio.fieldValue('first'), 'Zara');
+
+    await studio.undo();
+    await studio.flush();
+    expect(studio.fieldValue('first'), beforeField);
+
+    await studio.redo();
+    await studio.flush();
+    expect(studio.fieldValue('first'), 'Zara');
+    await studio.redo();
+    await studio.flush();
+    expect(studio.video.durationMs, 20000);
+  });
+  test('a video slider session is a single undo step', () async {
+    final before = studio.video.durationMs;
+    studio.beginVideoSession();
+    studio.updateVideo(studio.video.copyWith(durationMs: 16000));
+    studio.updateVideo(studio.video.copyWith(durationMs: 18000));
+    studio.updateVideo(studio.video.copyWith(durationMs: 20000));
+    studio.endVideoSession();
+    await studio.flush();
+    expect(studio.video.durationMs, 20000);
+
+    await studio.undo();
+    await studio.flush();
+    expect(studio.video.durationMs, before);
+    expect(studio.canUndo, isFalse);
+  });
   test('growing a field re-stacks the wording without overlap', () async {
     studio.selectLayer('first');
     await Future<void>.delayed(Duration.zero);

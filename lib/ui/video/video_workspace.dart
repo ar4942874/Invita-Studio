@@ -792,6 +792,8 @@ class _MotionInspectorState extends State<_MotionInspector> {
             min: 0,
             max: duration.toDouble(),
             values: RangeValues(start.toDouble(), end.toDouble()),
+            onChangeStart: (_) => widget.studio.beginVideoSession(),
+            onChangeEnd: (_) => widget.studio.endVideoSession(),
             onChanged: (values) => update(
               motion.copyWith(
                 visibleStartMs: values.start.round(),
@@ -844,6 +846,8 @@ class _MotionInspectorState extends State<_MotionInspector> {
             max: 3000,
             divisions: 29,
             value: motion.durationMs.clamp(100, 3000).toDouble(),
+            onChangeStart: (_) => widget.studio.beginVideoSession(),
+            onChangeEnd: (_) => widget.studio.endVideoSession(),
             onChanged: (value) =>
                 onChanged(motion.copyWith(durationMs: value.round())),
           ),
