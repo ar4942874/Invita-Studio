@@ -12,6 +12,7 @@ the build environment, and what still requires real devices.
 | Timeline model | `lib/domain/video/timeline.dart`: versioned `VideoTimeline` with duration (5–30 s), fixed 30 fps, background clip settings, per-layer `LayerMotion` (visible window, entrance, exit), and one optional music track. |
 | Animation | `fade`, `slideUp/Down/Left/Right`, `zoomIn/zoomOut` with duration 100–3000 ms, delay, and four easings. `evaluateTimeline` is the single evaluator used by both preview and export. |
 | Card presets | `MotionPreset` in `lib/domain/video/timeline.dart` gives a layman one-tap, whole-card styles — `fade`, `rise`, `zoomIn`, `zoomOut`, `pop`, `slide`, `stagger` ("One by one") and `none`. Each writes ordinary per-layer motions, so preview and export need no special case, and `MotionPreset.detect` re-highlights the style a timeline currently matches. `VideoTimeline.settledTimeMs` reports when every entrance has finished so an idle preview shows the settled card instead of a blank first frame. |
+| Looping motion | `AmbientMotion` (`none`, `drift`, `zoom`, `breathe`) applies one slow transform to **every** layer for the whole card. Entrances only occupy the first second, so without a looping motion the export was effectively a still image for the rest of its length. Applying a preset sets a matching looping motion (`zoomIn`/`zoomOut` → `zoom`, `rise`/`slide`/`stagger` → `drift`, `fade`/`pop` → `breathe`); the workspace header offers an override. |
 | Preview | Play/pause, scrubbing, timecode, ruler, layer tracks and playhead. The default workspace shows a preset strip so a non-technical user just taps a style; a `Customize` toggle reveals the per-layer inspector for window/effect/duration/easing. Frame painting goes through `TimelineFrameRenderer`. |
 | Export | `VideoExporter` freezes the document + timeline, renders each frame offscreen, and streams raw RGBA to a native encoder through `VideoEncoderBackend`. Frames are never queued in memory. |
 | Native encoders | Android `MediaCodec`/`MediaMuxer` (H.264 + AAC) and iOS `AVAssetWriter` (H.264, audio muxed in a second pass). Both are registered in `MainActivity.kt` / `AppDelegate.swift`. |
@@ -27,6 +28,7 @@ StudioProject (schemaVersion 2)
     ├── enabled, durationMs, fps (30)
     ├── background { kind, assetId?, trimStartMs, trimEndMs, fit, loop }
     ├── motions[layerId] { visibleStartMs, visibleEndMs, entrance, exit }
+    ├── ambient (none | drift | zoom | breathe)
     └── audio? { assetId, title, startMs, trimStartMs, trimEndMs,
                  durationMs, volume, fadeInMs, fadeOutMs }
 ```
@@ -169,11 +171,15 @@ swapped behind conditional imports:
 
 * **Export** — `video_encoder_platform.dart` selects
   `video_encoder_web.dart`, which records the rendered canvas through
-  `MediaRecorder` over `canvas.captureStream(0)` + `requestFrame()` paced to real
-  time. `VideoExporter` skips the temp file, `rename` and audio muxing on the web
-  (`kIsWeb` guards) and downloads the resulting blob through `saveBytes`
-  (File System Access API → `window.open` → anchor fallback). Output is WebM on
-  Chromium/Firefox and MP4 on Safari/newer Chromium, and is **always silent**.
+  `MediaRecorder` over `canvas.captureStream(fps)` paced to real time. The
+  canvas is attached offscreen (some engines only capture attached canvases),
+  the recorder is warmed up before frame 0 and the final frame is held before
+  stopping; manual `requestFrame()` capture was dropped because some browsers
+  ignore it and produced a still video. `VideoExporter` skips the temp file,
+  `rename` and audio muxing on the web (`kIsWeb` guards) and downloads the
+  resulting blob through `saveBytes` (File System Access API → `window.open` →
+  anchor fallback). Output is WebM on Chromium/Firefox and MP4 on
+  Safari/newer Chromium, and is **always silent**.
 * **Background-clip import** — `video_media_platform.dart` selects
   `video_media_service_web.dart`, which probes a picked file with a `<video>`
   element and extracts downscaled frames (seek + `drawImage` + PNG encode),

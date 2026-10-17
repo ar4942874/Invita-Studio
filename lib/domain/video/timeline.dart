@@ -19,7 +19,13 @@ abstract final class TimelineLimits {
   static const int maxLayersWithMotion = 50;
 
   /// Slide distance in document units (the document is always 1080 wide).
-  static const double slideDistance = 120;
+  static const double slideDistance = 150;
+
+  /// Range of the ambient (looping) motions, applied to every layer for the
+  /// whole card so the invitation is never a frozen still.
+  static const double ambientDriftDistance = 46;
+  static const double ambientZoom = 0.10;
+  static const double ambientBreathe = 0.03;
 
   static const int maxAudioVolume = 100;
   static const int maxFadeMs = 5000;
@@ -238,7 +244,7 @@ enum MotionPreset {
   final String tagline;
 
   /// Entrance length shared by every preset.
-  static const int entranceMs = 800;
+  static const int entranceMs = 1000;
 
   /// Builds the per-layer motions a preset writes over a clean window.
   ///
@@ -338,6 +344,19 @@ enum MotionPreset {
     }
   }
 
+  /// The looping motion a preset enables alongside its entrances, so the card
+  /// keeps moving after the entrances settle instead of freezing.
+  AmbientMotion get ambient => switch (this) {
+    MotionPreset.none => AmbientMotion.none,
+    MotionPreset.fade => AmbientMotion.breathe,
+    MotionPreset.rise => AmbientMotion.drift,
+    MotionPreset.zoomIn => AmbientMotion.zoom,
+    MotionPreset.zoomOut => AmbientMotion.zoom,
+    MotionPreset.pop => AmbientMotion.breathe,
+    MotionPreset.slide => AmbientMotion.drift,
+    MotionPreset.stagger => AmbientMotion.drift,
+  };
+
   /// Whether [motions] is exactly what this preset writes for [layerIds].
   bool matches({
     required Iterable<String> layerIds,
@@ -393,6 +412,32 @@ enum MotionPreset {
       a.durationMs == b.durationMs &&
       a.delayMs == b.delayMs &&
       a.easing == b.easing;
+}
+
+/// A slow looping motion applied to every layer for the whole card.
+///
+/// Entrances/exit only occupy the start (and end) of the video, so a card with
+/// just a preset entrance is frozen for most of its length. The ambient motion
+/// runs across the entire duration so the exported video always shows movement.
+enum AmbientMotion {
+  none('none', 'Still', 'No looping motion'),
+  drift('drift', 'Slow drift', 'The card glides gently the whole time'),
+  zoom('zoom', 'Slow zoom', 'The card keeps growing very slowly'),
+  breathe('breathe', 'Breathe', 'The card softly pulses in and out');
+
+  const AmbientMotion(this.wireName, this.label, this.tagline);
+  final String wireName;
+  final String label;
+  final String tagline;
+
+  static AmbientMotion? fromWire(String? value) {
+    for (final motion in AmbientMotion.values) {
+      if (motion.wireName == value) return motion;
+    }
+    return null;
+  }
+
+  bool get isAnimated => this != AmbientMotion.none;
 }
 
 /// What fills the frame behind the invitation layers.
@@ -628,6 +673,7 @@ class VideoTimeline {
     this.durationMs = 15000,
     this.background = const VideoBackground(),
     this.motions = const {},
+    this.ambient = AmbientMotion.none,
     this.audio,
   });
 
@@ -640,6 +686,9 @@ class VideoTimeline {
   /// Motion overrides keyed by layer ID. Layers without an entry are visible
   /// for the whole timeline with no effects.
   final Map<String, LayerMotion> motions;
+
+  /// Looping motion that runs for the whole card, on top of the entrances.
+  final AmbientMotion ambient;
   final VideoAudio? audio;
 
   int get fps => TimelineLimits.fps;
@@ -676,6 +725,7 @@ class VideoTimeline {
     int? durationMs,
     VideoBackground? background,
     Map<String, LayerMotion>? motions,
+    AmbientMotion? ambient,
     VideoAudio? audio,
     bool clearAudio = false,
   }) => VideoTimeline(
@@ -683,6 +733,7 @@ class VideoTimeline {
     durationMs: durationMs ?? this.durationMs,
     background: background ?? this.background,
     motions: motions ?? this.motions,
+    ambient: ambient ?? this.ambient,
     audio: clearAudio ? null : (audio ?? this.audio),
   );
 
@@ -749,6 +800,7 @@ class VideoTimeline {
     'motions': {
       for (final entry in motions.entries) entry.key: entry.value.toJson(),
     },
+    'ambient': ambient.wireName,
     'audio': audio?.toJson(),
   };
 
@@ -782,6 +834,7 @@ class VideoTimeline {
         motions[id] = LayerMotion.decode(entry.value, 'video.motions.$id');
       }
     }
+    final rawAmbient = raw['ambient'];
     return VideoTimeline(
       enabled: enabled,
       durationMs: duration,
@@ -790,6 +843,9 @@ class VideoTimeline {
         'video.background',
       ),
       motions: motions,
+      ambient: rawAmbient is String
+          ? (AmbientMotion.fromWire(rawAmbient) ?? AmbientMotion.none)
+          : AmbientMotion.none,
       audio: raw['audio'] == null ? null : VideoAudio.decode(raw['audio'], 'video.audio'),
     );
   }
@@ -832,15 +888,38 @@ TimelineFrame evaluateTimeline(
   int timeMs,
 ) {
   final t = timeMs.clamp(0, timeline.durationMs).toInt();
+  final ambient = _ambientAt(timeline, t);
   final layers = <String, LayerVisual>{};
   for (final id in nodeIds) {
     final motion = timeline.motionFor(id);
-    layers[id] = _evaluateLayer(motion, t);
+    layers[id] = _evaluateLayer(motion, t, ambient);
   }
   return TimelineFrame(timeMs: t, layers: layers);
 }
 
-LayerVisual _evaluateLayer(LayerMotion motion, int t) {
+/// The looping transform shared by every layer at instant [t].
+class _Ambient {
+  const _Ambient(this.dy, this.scale);
+  final double dy;
+  final double scale;
+}
+
+_Ambient _ambientAt(VideoTimeline timeline, int t) {
+  final duration = timeline.durationMs;
+  if (duration <= 0) return const _Ambient(0, 1);
+  final q = (t / duration).clamp(0.0, 1.0).toDouble();
+  return switch (timeline.ambient) {
+    AmbientMotion.none => const _Ambient(0, 1),
+    AmbientMotion.drift => _Ambient(-TimelineLimits.ambientDriftDistance * q, 1),
+    AmbientMotion.zoom => _Ambient(0, 1 + TimelineLimits.ambientZoom * q),
+    AmbientMotion.breathe => _Ambient(
+      0,
+      1 + TimelineLimits.ambientBreathe * math.sin(2 * math.pi * q),
+    ),
+  };
+}
+
+LayerVisual _evaluateLayer(LayerMotion motion, int t, _Ambient ambient) {
   final start = motion.visibleStartMs;
   final end = motion.visibleEndMs;
   if (t < start || t >= end) return LayerVisual.hidden;
@@ -880,8 +959,8 @@ LayerVisual _evaluateLayer(LayerMotion motion, int t) {
   return LayerVisual(
     visible: true,
     opacity: opacity.clamp(0.0, 1.0).toDouble(),
-    offset: offset,
-    scale: scale.clamp(0.2, 3.0).toDouble(),
+    offset: offset + Offset(0, ambient.dy),
+    scale: (scale * ambient.scale).clamp(0.2, 3.0).toDouble(),
   );
 }
 

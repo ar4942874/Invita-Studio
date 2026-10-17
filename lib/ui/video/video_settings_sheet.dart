@@ -110,6 +110,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
     if (preset != null) {
       updated = updated.copyWith(
         motions: preset.build(layerIds: layerIds, durationMs: next),
+        ambient: preset.ambient,
       );
     }
     _update(updated);

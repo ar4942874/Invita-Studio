@@ -167,6 +167,7 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
           layerIds: _layerIds,
           durationMs: timeline.durationMs,
         ),
+        ambient: preset.ambient,
       ),
     );
     _playback.seek(0);
@@ -209,6 +210,9 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
         ),
         _AnimationGallery(
           selected: _selectedPreset,
+          ambient: timeline.ambient,
+          onAmbient: (value) =>
+              widget.studio.updateVideo(timeline.copyWith(ambient: value)),
           advanced: _advanced,
           onToggleAdvanced: () => setState(() => _advanced = !_advanced),
           onApply: _applyPreset,
@@ -879,12 +883,16 @@ IconData _presetIcon(MotionPreset preset) => switch (preset) {
 class _AnimationGallery extends StatelessWidget {
   const _AnimationGallery({
     required this.selected,
+    required this.ambient,
+    required this.onAmbient,
     required this.advanced,
     required this.onToggleAdvanced,
     required this.onApply,
   });
 
   final MotionPreset? selected;
+  final AmbientMotion ambient;
+  final void Function(AmbientMotion) onAmbient;
   final bool advanced;
   final VoidCallback onToggleAdvanced;
   final void Function(MotionPreset) onApply;
@@ -922,6 +930,43 @@ class _AnimationGallery extends StatelessWidget {
                   style: TextStyle(fontSize: 9.5, color: StudioColors.muted),
                 ),
               ),
+              PopupMenuButton<AmbientMotion>(
+                tooltip: 'Looping motion',
+                onSelected: onAmbient,
+                padding: EdgeInsets.zero,
+                position: PopupMenuPosition.under,
+                itemBuilder: (context) => [
+                  for (final motion in AmbientMotion.values)
+                    PopupMenuItem(
+                      value: motion,
+                      child: Text(motion.label),
+                    ),
+                ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.slow_motion_video_outlined,
+                      size: 14,
+                      color: StudioColors.muted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      ambient.label,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: StudioColors.ink,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      size: 16,
+                      color: StudioColors.muted,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
               TextButton.icon(
                 onPressed: onToggleAdvanced,
                 icon: Icon(advanced ? Icons.check_rounded : Icons.tune, size: 14),

@@ -30,16 +30,27 @@ class WebVideoEncoderBackend implements VideoEncoderBackend {
     final canvas = web.HTMLCanvasElement()
       ..width = spec.width
       ..height = spec.height;
+    // Some engines only emit canvas-capture frames while the canvas is attached
+    // to the document, so keep it offscreen but rendered.
+    canvas.setAttribute(
+      'style',
+      'position:fixed;left:-100000px;top:0;pointer-events:none;',
+    );
+    web.document.body?.appendChild(canvas);
     final context = canvas.getContext('2d') as web.CanvasRenderingContext2D?;
     if (context == null) {
+      canvas.remove();
       throw StateError('The browser could not create a 2D drawing surface.');
     }
-    final stream = canvas.captureStream(0);
-    final tracks = stream.getVideoTracks().toDart;
-    if (tracks.isEmpty) {
+    // Capture at the timeline frame rate. The exporter already paces frames at
+    // real time, so the browser stamps each drawn frame with the right moment;
+    // manual `requestFrame` capture is ignored by some browsers and produced a
+    // still image there.
+    final stream = canvas.captureStream(spec.fps);
+    if (stream.getVideoTracks().toDart.isEmpty) {
+      canvas.remove();
       throw StateError('The browser did not expose a canvas video track.');
     }
-    final track = tracks.first as web.CanvasCaptureMediaStreamTrack;
     final mime = _pickMimeType();
     final recorder = web.MediaRecorder(
       stream,
@@ -49,8 +60,8 @@ class WebVideoEncoderBackend implements VideoEncoderBackend {
       ),
     );
     return _WebVideoEncoderSession(
+      canvas: canvas,
       context: context,
-      track: track,
       recorder: recorder,
       spec: spec,
       mimeType: mime,
@@ -74,8 +85,8 @@ class WebVideoEncoderBackend implements VideoEncoderBackend {
 
 class _WebVideoEncoderSession implements VideoEncoderSession {
   _WebVideoEncoderSession({
+    required this.canvas,
     required this.context,
-    required this.track,
     required this.recorder,
     required this.spec,
     required this.mimeType,
@@ -91,43 +102,66 @@ class _WebVideoEncoderSession implements VideoEncoderSession {
         _stop.completeError(StateError('The browser recorder failed.'));
       }
     }).toJS;
-    _startedAt = DateTime.now();
-    recorder.start();
   }
 
+  final web.HTMLCanvasElement canvas;
   final web.CanvasRenderingContext2D context;
-  final web.CanvasCaptureMediaStreamTrack track;
   final web.MediaRecorder recorder;
   final VideoEncodeSpec spec;
   final String mimeType;
   final List<web.Blob> chunks = <web.Blob>[];
   final Completer<void> _stop = Completer<void>();
-  late final DateTime _startedAt;
+
+  bool _started = false;
+
+  /// Anchors timeline time to wall time; set once the recorder is live so the
+  /// entrances are not compressed into the startup burst.
+  DateTime? _clock;
   bool _closed = false;
 
   @override
   Future<void> addFrame(Uint8List rgba, int timestampUs) async {
     if (_closed) throw StateError('Encoder session is closed.');
+    if (!_started) {
+      _started = true;
+      // Paint the first frame before the recorder goes live, so the video never
+      // opens on a blank canvas. The recorder warms up while that frame is on
+      // screen and the next frame is rendered.
+      _draw(rgba);
+      recorder.start();
+      _clock = DateTime.now();
+      return;
+    }
     // Drive the recorder at real time so the browser stamps correct durations.
-    final target = _startedAt.add(Duration(microseconds: timestampUs));
+    final target = _clock!.add(Duration(microseconds: timestampUs));
     final delay = target.difference(DateTime.now());
     if (delay > Duration.zero) await Future<void>.delayed(delay);
+    _draw(rgba);
+  }
+
+  void _draw(Uint8List rgba) {
     final clamped = Uint8ClampedList.view(
       rgba.buffer,
       rgba.offsetInBytes,
       rgba.lengthInBytes,
     );
-    final image = web.ImageData(clamped.toJS, spec.width);
-    context.putImageData(image, 0, 0);
-    track.requestFrame();
+    context.putImageData(web.ImageData(clamped.toJS, spec.width), 0, 0);
   }
 
   @override
   Future<EncodedVideo> finish() async {
     if (_closed) throw StateError('Encoder session is closed.');
     _closed = true;
-    if (recorder.state != 'inactive') recorder.stop();
-    if (!_stop.isCompleted) await _stop.future;
+    if (_started) {
+      // Give the auto-capturing recorder a moment to grab the final frame
+      // before the stream stops.
+      if (recorder.state != 'inactive') {
+        await Future<void>.delayed(const Duration(milliseconds: 140));
+        recorder.stop();
+      }
+      if (!_stop.isCompleted) await _stop.future;
+    }
+    _releaseCanvas();
     if (chunks.isEmpty) {
       throw StateError('The browser recorder captured no video data.');
     }
@@ -149,7 +183,14 @@ class _WebVideoEncoderSession implements VideoEncoderSession {
     } catch (_) {
       // Stopping an already-failed recorder is a no-op.
     }
+    _releaseCanvas();
     chunks.clear();
+  }
+
+  void _releaseCanvas() {
+    canvas.width = 0;
+    canvas.height = 0;
+    canvas.remove();
   }
 
   String _blobType() {

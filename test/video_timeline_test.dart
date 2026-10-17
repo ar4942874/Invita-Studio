@@ -429,4 +429,72 @@ void main() {
       expect(decoded.motions['second']!.entrance.effect, MotionEffect.slideUp);
     });
   });
+
+  group('ambient motion', () {
+    test('drift moves every layer across the whole card', () {
+      const timeline = VideoTimeline(
+        durationMs: 10000,
+        ambient: AmbientMotion.drift,
+      );
+      final start = evaluateTimeline(timeline, const ['a'], 0).visualFor('a');
+      final mid = evaluateTimeline(timeline, const ['a'], 5000).visualFor('a');
+      final end = evaluateTimeline(timeline, const ['a'], 10000).visualFor('a');
+      expect(start.offset.dy, closeTo(0, 1e-9));
+      expect(
+        end.offset.dy,
+        closeTo(-TimelineLimits.ambientDriftDistance, 1e-9),
+      );
+      expect(mid.offset.dy, lessThan(start.offset.dy));
+      expect(mid.offset.dy, greaterThan(end.offset.dy));
+    });
+
+    test('zoom grows the scale and breathe stays in range', () {
+      const zoom = VideoTimeline(
+        durationMs: 10000,
+        ambient: AmbientMotion.zoom,
+      );
+      expect(evaluateTimeline(zoom, const ['a'], 0).visualFor('a').scale, 1);
+      expect(
+        evaluateTimeline(zoom, const ['a'], 10000).visualFor('a').scale,
+        closeTo(1 + TimelineLimits.ambientZoom, 1e-9),
+      );
+      const breathe = VideoTimeline(
+        durationMs: 10000,
+        ambient: AmbientMotion.breathe,
+      );
+      for (var t = 0; t <= 10000; t += 250) {
+        final scale =
+            evaluateTimeline(breathe, const ['a'], t).visualFor('a').scale;
+        expect(scale, greaterThanOrEqualTo(0.2));
+        expect(scale, lessThanOrEqualTo(1 + TimelineLimits.ambientBreathe + 1e-9));
+      }
+    });
+
+    test('is off by default and survives a JSON round-trip', () {
+      expect(VideoTimeline.decode(null).ambient, AmbientMotion.none);
+      const timeline = VideoTimeline(
+        durationMs: 12000,
+        ambient: AmbientMotion.zoom,
+      );
+      expect(VideoTimeline.decode(timeline.toJson()).ambient, AmbientMotion.zoom);
+      expect(
+        VideoTimeline.decode({'durationMs': 12000, 'ambient': 'nonsense'}).ambient,
+        AmbientMotion.none,
+      );
+    });
+
+    test('presets that animate a card also enable a looping motion', () {
+      for (final preset in MotionPreset.values) {
+        if (preset == MotionPreset.none) {
+          expect(preset.ambient, AmbientMotion.none);
+        } else {
+          expect(
+            preset.ambient.isAnimated,
+            isTrue,
+            reason: '${preset.wireName} should keep the card moving',
+          );
+        }
+      }
+    });
+  });
 }
