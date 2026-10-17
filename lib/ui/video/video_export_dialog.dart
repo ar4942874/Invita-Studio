@@ -72,7 +72,7 @@ class _QualityRow extends StatelessWidget {
                 ? Icons.radio_button_checked
                 : Icons.radio_button_unchecked,
             size: 17,
-            color: selected ? StudioColors.green : StudioColors.muted,
+            color: selected ? StudioColors.accent : StudioColors.muted,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -281,7 +281,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: StudioColors.paleGreen,
+                    color: StudioColors.accentSoft,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Column(
@@ -289,7 +289,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.check_circle_outline, size: 16, color: StudioColors.green),
+                          const Icon(Icons.check_circle_outline, size: 16, color: StudioColors.accent),
                           const SizedBox(width: 6),
                           Text(
                             kIsWeb
@@ -429,10 +429,10 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
   Widget _notice(String text, {bool warning = false}) => Container(
     padding: const EdgeInsets.all(10),
     decoration: BoxDecoration(
-      color: warning ? const Color(0xFFFFF3E5) : StudioColors.wash,
-      borderRadius: BorderRadius.circular(8),
+      color: warning ? StudioColors.warningSoft : StudioColors.wash,
+      borderRadius: StudioShape.smRadius,
       border: Border.all(
-        color: warning ? const Color(0xFFE9D3B4) : StudioColors.border,
+        color: warning ? StudioColors.warningBorder : StudioColors.border,
       ),
     ),
     child: Text(
@@ -440,7 +440,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
       style: TextStyle(
         fontSize: 10.5,
         height: 1.45,
-        color: warning ? const Color(0xFF8A5B1E) : StudioColors.ink,
+        color: warning ? StudioColors.warningInk : StudioColors.ink,
       ),
     ),
   );

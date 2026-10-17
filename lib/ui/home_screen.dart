@@ -101,30 +101,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.white,
-    body: SafeArea(
-      child: Column(
-        children: [
-          _topBar(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 26, 20, 40),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1040),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
-                    child: switch (_step) {
-                      0 => _categoryStep(),
-                      1 => _detailsStep(),
-                      _ => _cardStep(),
-                    },
+    backgroundColor: StudioColors.canvas,
+    body: DecoratedBox(
+      decoration: const BoxDecoration(gradient: studioPageGradient),
+      child: SafeArea(
+        child: Column(
+          children: [
+            _topBar(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 26, 20, 40),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1040),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: switch (_step) {
+                        0 => _categoryStep(),
+                        1 => _detailsStep(),
+                        _ => _cardStep(),
+                      },
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
@@ -132,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _topBar() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
     decoration: const BoxDecoration(
-      color: Colors.white,
+      color: StudioColors.surface,
       border: Border(bottom: BorderSide(color: StudioColors.border)),
     ),
     child: Row(
@@ -226,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: StudioColors.paleGreen.withValues(alpha: .5),
+        color: StudioColors.accentSoft.withValues(alpha: .5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: StudioColors.border),
       ),
@@ -238,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const Icon(
                 Icons.edit_note_outlined,
                 size: 18,
-                color: StudioColors.green,
+                color: StudioColors.accent,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -414,10 +417,10 @@ class _CategoryTile extends StatelessWidget {
               height: 42,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: StudioColors.paleGreen,
+                color: StudioColors.accentSoft,
                 borderRadius: BorderRadius.circular(11),
               ),
-              child: Icon(category.icon, size: 21, color: StudioColors.green),
+              child: Icon(category.icon, size: 21, color: StudioColors.accent),
             ),
             const SizedBox(width: 13),
             Expanded(
@@ -476,7 +479,7 @@ class _CardTile extends StatelessWidget {
     );
     return Material(
       color: selected
-          ? StudioColors.paleGreen.withValues(alpha: .55)
+          ? StudioColors.accentSoft.withValues(alpha: .55)
           : StudioColors.wash,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
@@ -486,7 +489,7 @@ class _CardTile extends StatelessWidget {
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
             border: Border.all(
-              color: selected ? StudioColors.green : StudioColors.border,
+              color: selected ? StudioColors.accent : StudioColors.border,
               width: selected ? 1.4 : 1,
             ),
             borderRadius: BorderRadius.circular(12),
@@ -517,7 +520,7 @@ class _CardTile extends StatelessWidget {
                     const Icon(
                       Icons.check_circle,
                       size: 17,
-                      color: StudioColors.green,
+                      color: StudioColors.accent,
                     ),
                 ],
               ),

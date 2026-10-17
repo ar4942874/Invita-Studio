@@ -124,10 +124,10 @@ class TinyLabel extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     text.toUpperCase(),
     style: TextStyle(
-      fontSize: 9,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 1.6,
-      color: color ?? StudioColors.muted,
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1.2,
+      color: color ?? StudioColors.meta,
     ),
   );
 }
@@ -140,13 +140,13 @@ class BrandMark extends StatelessWidget {
     width: size,
     height: size,
     decoration: BoxDecoration(
-      color: StudioColors.green,
+      color: StudioColors.accent,
       borderRadius: BorderRadius.circular(size * .28),
     ),
     child: Icon(
       Icons.spa_outlined,
       size: size * .59,
-      color: const Color(0xFFEEF2E5),
+      color: StudioColors.accentOn,
     ),
   );
 }
@@ -165,8 +165,8 @@ class HintBox extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(13),
     decoration: BoxDecoration(
-      color: warning ? const Color(0xFFFFF3E5) : StudioColors.wash,
-      borderRadius: BorderRadius.circular(9),
+      color: warning ? StudioColors.warningSoft : StudioColors.wash,
+      borderRadius: StudioShape.smRadius,
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +174,7 @@ class HintBox extends StatelessWidget {
         Icon(
           icon,
           size: 16,
-          color: warning ? const Color(0xFFAD722B) : StudioColors.green,
+          color: warning ? StudioColors.warning : StudioColors.accent,
         ),
         const SizedBox(width: 9),
         Expanded(

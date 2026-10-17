@@ -162,7 +162,7 @@ class _ExportDialogState extends State<ExportDialog> {
                   children: [
                     const TinyLabel(
                       'Send a little joy',
-                      color: StudioColors.green,
+                      color: StudioColors.accent,
                     ),
                     const Spacer(),
                     IconButton(
@@ -235,7 +235,7 @@ class _ExportDialogState extends State<ExportDialog> {
                                       ? Icons.verified_outlined
                                       : Icons.check_circle_outline,
                                   size: 14,
-                                  color: StudioColors.green,
+                                  color: StudioColors.accent,
                                 ),
                                 const SizedBox(width: 5),
                                 Expanded(
@@ -245,7 +245,7 @@ class _ExportDialogState extends State<ExportDialog> {
                                         : '${_file!.width} × ${_file!.height} · ${_file!.sizeLabel}',
                                     style: const TextStyle(
                                       fontSize: 10,
-                                      color: StudioColors.green,
+                                      color: StudioColors.accent,
                                     ),
                                   ),
                                 ),
@@ -393,7 +393,7 @@ class _FormatOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Material(
     color: selected
-        ? StudioColors.paleGreen.withValues(alpha: .6)
+        ? StudioColors.accentSoft.withValues(alpha: .6)
         : Colors.white,
     borderRadius: BorderRadius.circular(8),
     child: InkWell(
@@ -403,7 +403,7 @@ class _FormatOption extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           border: Border.all(
-            color: selected ? StudioColors.green : StudioColors.border,
+            color: selected ? StudioColors.accent : StudioColors.border,
             width: selected ? 1.4 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
@@ -426,7 +426,7 @@ class _FormatOption extends StatelessWidget {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_off,
                   size: 16,
-                  color: selected ? StudioColors.green : StudioColors.muted,
+                  color: selected ? StudioColors.accent : StudioColors.muted,
                 ),
               ],
             ),

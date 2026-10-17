@@ -61,7 +61,7 @@ class DetailsPanel extends StatelessWidget {
           height: 23,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: StudioColors.paleGreen,
+            color: StudioColors.accentSoft,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
@@ -69,7 +69,7 @@ class DetailsPanel extends StatelessWidget {
             style: const TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w600,
-              color: StudioColors.green,
+              color: StudioColors.accent,
             ),
           ),
         ),
@@ -208,7 +208,7 @@ class _TemplateTile extends StatelessWidget {
     );
     return Material(
       color: selected
-          ? StudioColors.paleGreen.withValues(alpha: .55)
+          ? StudioColors.accentSoft.withValues(alpha: .55)
           : StudioColors.wash,
       borderRadius: BorderRadius.circular(11),
       child: InkWell(
@@ -221,7 +221,7 @@ class _TemplateTile extends StatelessWidget {
           padding: const EdgeInsets.all(11),
           decoration: BoxDecoration(
             border: Border.all(
-              color: selected ? StudioColors.green : StudioColors.border,
+              color: selected ? StudioColors.accent : StudioColors.border,
               width: selected ? 1.4 : 1,
             ),
             borderRadius: BorderRadius.circular(11),
@@ -286,14 +286,14 @@ class _TemplateTile extends StatelessWidget {
                           Icon(
                             Icons.check_circle,
                             size: 12,
-                            color: StudioColors.green,
+                            color: StudioColors.accent,
                           ),
                           SizedBox(width: 4),
                           Text(
                             'Selected',
                             style: TextStyle(
                               fontSize: 9,
-                              color: StudioColors.green,
+                              color: StudioColors.accent,
                             ),
                           ),
                         ],
@@ -359,7 +359,7 @@ class LayersPanel extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 6),
             child: Material(
               color: studio.selectedNode?.id == n.id
-                  ? StudioColors.paleGreen
+                  ? StudioColors.accentSoft
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               child: ListTile(
@@ -371,7 +371,7 @@ class LayersPanel extends StatelessWidget {
                 leading: Icon(
                   n is ImageNode ? Icons.image_outlined : Icons.text_fields,
                   size: 19,
-                  color: StudioColors.green,
+                  color: StudioColors.accent,
                 ),
                 title: Text(
                   n is ImageNode ? 'Photo' : layerLabel(n.id),
@@ -500,7 +500,7 @@ class StylePanel extends StatelessWidget {
               const Icon(
                 Icons.text_fields,
                 size: 21,
-                color: StudioColors.green,
+                color: StudioColors.accent,
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -656,7 +656,7 @@ class StylePanel extends StatelessWidget {
               ),
               style: IconButton.styleFrom(
                 backgroundColor: reference.fontWeight >= 600
-                    ? StudioColors.paleGreen
+                    ? StudioColors.accentSoft
                     : StudioColors.wash,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(7),
@@ -689,7 +689,7 @@ class StylePanel extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: reference.textColor.toUpperCase() == color
-                            ? StudioColors.green
+                            ? StudioColors.accent
                             : Colors.transparent,
                         width: 1.4,
                       ),
@@ -813,7 +813,7 @@ class StylePanel extends StatelessWidget {
               width: 6,
               height: 6,
               decoration: const BoxDecoration(
-                color: StudioColors.green,
+                color: StudioColors.accent,
                 shape: BoxShape.circle,
               ),
             ),

@@ -103,7 +103,7 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                     children: [
                       const TinyLabel(
                         'A little love. A lasting impression.',
-                        color: StudioColors.green,
+                        color: StudioColors.accent,
                       ),
                       const SizedBox(height: 8),
                       const Text(
@@ -134,7 +134,7 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                       Icon(
                         Icons.auto_awesome_outlined,
                         size: 12,
-                        color: StudioColors.green,
+                        color: StudioColors.accent,
                       ),
                       SizedBox(width: 5),
                       Text(
@@ -142,7 +142,7 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                         style: TextStyle(
                           fontSize: 8,
                           letterSpacing: 1,
-                          color: StudioColors.green,
+                          color: StudioColors.accent,
                         ),
                       ),
                     ],
@@ -242,7 +242,7 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
               gradient: RadialGradient(
                 center: Alignment(0, -.25),
                 radius: .9,
-                colors: [Color(0xFFF7F8F2), StudioColors.canvas],
+                colors: [StudioColors.surface, StudioColors.canvas],
               ),
             ),
             child: CustomPaint(
@@ -271,7 +271,7 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                               width: 5,
                               height: 5,
                               decoration: const BoxDecoration(
-                                color: Color(0xFF78956D),
+                                color: StudioColors.accent,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -303,8 +303,7 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                               borderRadius: BorderRadius.circular(2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF3B4D38)
-                                      .withValues(alpha: .13),
+                                  color: StudioColors.ink.withValues(alpha: .13),
                                   blurRadius: 26,
                                   offset: const Offset(0, 12),
                                 ),
@@ -321,9 +320,9 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                                   controller: studio.editor,
                                   viewportPadding: 0,
                                   theme: const CanvasTheme(
-                                    selectionBorderColor: StudioColors.green,
-                                    handleColor: StudioColors.green,
-                                    rotationHandleColor: StudioColors.green,
+                                    selectionBorderColor: StudioColors.accent,
+                                    handleColor: StudioColors.accent,
+                                    rotationHandleColor: StudioColors.accent,
                                     selectionBorderWidth: 1.2,
                                     handleSize: 7,
                                   ),
@@ -407,7 +406,7 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                 const Icon(
                   Icons.verified_outlined,
                   size: 12,
-                  color: StudioColors.green,
+                  color: StudioColors.accent,
                 ),
                 const SizedBox(width: 5),
                 const Text(
@@ -432,7 +431,7 @@ class _DotGrid extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF75836C).withValues(alpha: .13);
+      ..color = StudioColors.muted.withValues(alpha: .16);
     for (double x = 12; x < size.width; x += 20) {
       for (double y = 12; y < size.height; y += 20) {
         canvas.drawCircle(Offset(x, y), .65, paint);

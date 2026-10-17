@@ -56,6 +56,14 @@ Provider images are cloned before a canvas/export owns their handles. Received `
 
 The painter now lays out text at the full frame width, which is necessary for real center/right alignment. The host supplies zero engine padding inside its own paper frame. Viewport zoom is outside the document/export path.
 
+## Visual system
+
+The whole UI is themed from the OpenDesign **`premium`** design system (open-design/design-systems/premium). The design contract lives in `lib/ui/studio_theme.dart`: token names (`StudioColors`, `StudioShape`, `StudioMotion`, `StudioShadows`, `StudioType`, `studioPageGradient`) deliberately mirror the package's CSS custom properties so the app can be re-skinned from another OpenDesign package by editing one file.
+
+The palette is a warm-white canvas (`#FAF8F4`) with a graphite ink ramp and a muted bronze accent (`#A06A3B`) as the single signal colour; status uses the package's success/warn/danger tokens rather than ad-hoc hex values. Widgets consume the tokens instead of hard-coding colours.
+
+The package names the commercial typefaces *Canela* (display) and *Inter* (body). Because neither is redistributable, the app substitutes the bundled OFL families **Cormorant Garamond** and **DM Sans**, which share the same display/body roles and keep the build offline and portable.
+
 ## Export path
 
 1. Unfocus inline editing and flush queued host edits before opening export.

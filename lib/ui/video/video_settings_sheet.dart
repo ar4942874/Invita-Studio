@@ -365,7 +365,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
               else if (_clip != null) ...[
                 Row(
                   children: [
-                    const Icon(Icons.movie_outlined, size: 15, color: StudioColors.green),
+                    const Icon(Icons.movie_outlined, size: 15, color: StudioColors.accent),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -465,7 +465,7 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
               else
                 Row(
                   children: [
-                    const Icon(Icons.music_note_outlined, size: 15, color: StudioColors.green),
+                    const Icon(Icons.music_note_outlined, size: 15, color: StudioColors.accent),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -692,13 +692,17 @@ class _VideoSettingsSheetState extends State<VideoSettingsSheet> {
     padding: const EdgeInsets.all(10),
     margin: const EdgeInsets.only(bottom: 6),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFF3E5),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: const Color(0xFFE9D3B4)),
+      color: StudioColors.warningSoft,
+      borderRadius: StudioShape.smRadius,
+      border: Border.all(color: StudioColors.warningBorder),
     ),
     child: Text(
       text,
-      style: const TextStyle(fontSize: 10.5, height: 1.4, color: Color(0xFF8A5B1E)),
+      style: const TextStyle(
+        fontSize: 10.5,
+        height: 1.4,
+        color: StudioColors.warningInk,
+      ),
     ),
   );
 

@@ -298,7 +298,7 @@ class _Transport extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 10.5,
-                color: media.audioMissing ? const Color(0xFFAD722B) : StudioColors.muted,
+                color: media.audioMissing ? StudioColors.warning : StudioColors.muted,
               ),
             ),
           ),
@@ -441,7 +441,7 @@ class _TimelinePanel extends StatelessWidget {
                     child: IgnorePointer(
                       child: Container(
                         width: 1.5,
-                        color: StudioColors.green,
+                        color: StudioColors.accent,
                       ),
                     ),
                   ),
@@ -470,7 +470,7 @@ class _PlayheadHandle extends StatelessWidget {
     width: 10,
     height: 10,
     decoration: BoxDecoration(
-      color: StudioColors.green,
+      color: StudioColors.accent,
       borderRadius: BorderRadius.circular(2),
     ),
   );
@@ -561,7 +561,7 @@ class _LayerRow extends StatelessWidget {
                   Icon(
                     node is TextNode ? Icons.title : Icons.photo_outlined,
                     size: 12,
-                    color: selected ? StudioColors.green : StudioColors.muted,
+                    color: selected ? StudioColors.accent : StudioColors.muted,
                   ),
                   const SizedBox(width: 5),
                   Expanded(
@@ -613,12 +613,12 @@ class _LayerRow extends StatelessWidget {
                           width: barWidth,
                           decoration: BoxDecoration(
                             color: selected
-                                ? StudioColors.green
-                                : StudioColors.paleGreen,
+                                ? StudioColors.accent
+                                : StudioColors.accentSoft,
                             borderRadius: BorderRadius.circular(3),
                             border: Border.all(
                               color: selected
-                                  ? StudioColors.green
+                                  ? StudioColors.accent
                                   : StudioColors.border,
                             ),
                           ),
@@ -714,7 +714,7 @@ class _MotionInspectorState extends State<_MotionInspector> {
             onTap: () => setState(() => _expanded = !_expanded),
             child: Row(
               children: [
-                const Icon(Icons.auto_awesome_outlined, size: 14, color: StudioColors.green),
+                const Icon(Icons.auto_awesome_outlined, size: 14, color: StudioColors.accent),
                 const SizedBox(width: 6),
                 Text(
                   'Animate “${widget.layerName}”',
@@ -913,7 +913,7 @@ class _AnimationGallery extends StatelessWidget {
               const Icon(
                 Icons.auto_awesome_outlined,
                 size: 14,
-                color: StudioColors.green,
+                color: StudioColors.accent,
               ),
               const SizedBox(width: 6),
               const Text(
@@ -1012,11 +1012,11 @@ class _AnimationStyleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? StudioColors.paleGreen : Colors.white,
+      color: selected ? StudioColors.accentSoft : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: selected ? StudioColors.green : StudioColors.border,
+          color: selected ? StudioColors.accent : StudioColors.border,
           width: selected ? 1.6 : 1,
         ),
       ),
@@ -1032,7 +1032,7 @@ class _AnimationStyleCard extends StatelessWidget {
                 Icon(
                   _presetIcon(preset),
                   size: 18,
-                  color: selected ? StudioColors.green : StudioColors.muted,
+                  color: selected ? StudioColors.accent : StudioColors.muted,
                 ),
                 const SizedBox(width: 8),
                 Expanded(

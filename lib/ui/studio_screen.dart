@@ -105,7 +105,7 @@ class _StudioScreenState extends State<StudioScreen>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: StudioColors.surface,
       showDragHandle: true,
       useSafeArea: true,
       builder: (context) => FractionallySizedBox(
@@ -374,7 +374,7 @@ class _StudioScreenState extends State<StudioScreen>
                                       style: TextStyle(fontSize: 9),
                                     ),
                                     side: BorderSide.none,
-                                    backgroundColor: StudioColors.paleGreen,
+                                    backgroundColor: StudioColors.accentSoft,
                                   )
                                 : IconButton(
                                     tooltip: 'Delete local draft',
@@ -447,7 +447,7 @@ class _StudioScreenState extends State<StudioScreen>
   Widget _saveStatus({bool compact = false}) {
     final failed = studio.saveState == SaveState.failed;
     final saving = studio.saveState == SaveState.saving;
-    final color = failed ? const Color(0xFFAE7532) : StudioColors.green;
+    final color = failed ? StudioColors.warning : StudioColors.accent;
     return Tooltip(
       message:
           studio.storageError ??
@@ -776,7 +776,7 @@ class _StudioScreenState extends State<StudioScreen>
                     ),
                     if (studio.storageError != null && mobile)
                       Material(
-                        color: const Color(0xFFFFF3E5),
+                        color: StudioColors.warningSoft,
                         child: InkWell(
                           onTap: _backup,
                           child: const Padding(
@@ -789,7 +789,7 @@ class _StudioScreenState extends State<StudioScreen>
                                 Icon(
                                   Icons.warning_amber_rounded,
                                   size: 14,
-                                  color: Color(0xFFAD722B),
+                                  color: StudioColors.warning,
                                 ),
                                 SizedBox(width: 7),
                                 Expanded(
@@ -833,7 +833,7 @@ class _StudioScreenState extends State<StudioScreen>
                                           Icons.format_color_text,
                                         ][i],
                                         size: 20,
-                                        color: StudioColors.green,
+                                        color: StudioColors.accent,
                                       ),
                                       const SizedBox(height: 5),
                                       Text(
@@ -936,7 +936,7 @@ class _ModeSwitch extends StatelessWidget {
           Icon(
             icon,
             size: 13,
-            color: selected ? StudioColors.green : StudioColors.muted,
+            color: selected ? StudioColors.accent : StudioColors.muted,
           ),
           const SizedBox(width: 5),
           Text(
@@ -972,7 +972,7 @@ class _SideTab extends StatelessWidget {
       height: 33,
       margin: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
-        color: selected ? StudioColors.paleGreen : Colors.transparent,
+        color: selected ? StudioColors.accentSoft : Colors.transparent,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -981,7 +981,7 @@ class _SideTab extends StatelessWidget {
           Icon(
             icon,
             size: 13,
-            color: selected ? StudioColors.green : StudioColors.muted,
+            color: selected ? StudioColors.accent : StudioColors.muted,
           ),
           const SizedBox(width: 5),
           Text(
@@ -989,7 +989,7 @@ class _SideTab extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              color: selected ? StudioColors.green : StudioColors.muted,
+              color: selected ? StudioColors.accent : StudioColors.muted,
             ),
           ),
         ],
