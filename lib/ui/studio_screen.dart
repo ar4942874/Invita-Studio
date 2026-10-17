@@ -280,13 +280,13 @@ class _StudioScreenState extends State<StudioScreen>
     showAboutDialog(
       context: context,
       applicationName: 'Invita Studio',
-      applicationVersion: '1.0 · image-first preview',
+      applicationVersion: '1.1 · image & video',
       applicationIcon: const BrandMark(size: 50),
       applicationLegalese: 'Built with Flutter and the BSD-3-Clause flutter_canvas_editor engine.\nOriginal invitation art. Locally bundled OFL fonts.',
       children: [
         const SizedBox(height: 16),
         const Text(
-          'Your invitation stays on this device. Export a JSON project for a portable backup. Native sharing uses your device’s share sheet; availability and delivery depend on the receiving app.\n\nAnimated video is not part of this image-first build.',
+          'Your invitation stays on this device. Export a JSON project for a portable backup. Native sharing uses your device’s share sheet; availability and delivery depend on the receiving app.\n\nVideo invitations render to MP4 with the device encoder on Android and iOS; the browser and desktop builds animate the invitation but cannot encode the file.',
           style: TextStyle(fontSize: 12),
         ),
       ],
@@ -569,7 +569,7 @@ class _StudioScreenState extends State<StudioScreen>
               onPressed: _drafts,
               icon: const Icon(Icons.folder_open_outlined, size: 20),
             )
-          else if (!mobile)
+          else if (!mobile && width >= 1000)
             TextButton.icon(
               onPressed: _drafts,
               icon: const Icon(Icons.folder_open_outlined, size: 17),

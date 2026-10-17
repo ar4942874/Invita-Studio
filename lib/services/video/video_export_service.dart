@@ -14,7 +14,6 @@ import 'video_media.dart';
 enum VideoExportStage {
   preparing('Preparing'),
   rendering('Rendering frames'),
-  encodingAudio('Adding music'),
   finishing('Finishing file'),
   done('Done');
 
@@ -41,7 +40,6 @@ class VideoExportProgress {
     return switch (stage) {
       VideoExportStage.preparing => 0,
       VideoExportStage.rendering => frameFraction * 0.92,
-      VideoExportStage.encodingAudio => 0.95,
       VideoExportStage.finishing => 0.98,
       VideoExportStage.done => 1,
     };

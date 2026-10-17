@@ -8,41 +8,38 @@ import 'package:flutter/scheduler.dart';
 class VideoPlaybackController extends ChangeNotifier {
   VideoPlaybackController({
     required TickerProvider vsync,
-    required int durationMs,
+    required this.durationMs,
     this.loop = true,
-  }) : _durationMs = durationMs {
+  }) {
     _ticker = vsync.createTicker(_onTick);
   }
 
   late final Ticker _ticker;
   final bool loop;
 
-  int _durationMs;
+  int durationMs;
   int _positionMs = 0;
   bool _playing = false;
-  int _startPositionMs = 0;
   Duration _lastElapsed = Duration.zero;
 
-  int get durationMs => _durationMs;
   int get positionMs => _positionMs;
   bool get playing => _playing;
 
-  double get fraction => _durationMs <= 0 ? 0 : _positionMs / _durationMs;
+  double get fraction => durationMs <= 0 ? 0 : _positionMs / durationMs;
 
   String get timecode => formatTimecode(_positionMs);
-  String get durationTimecode => formatTimecode(_durationMs);
+  String get durationTimecode => formatTimecode(durationMs);
 
   void setDuration(int value) {
-    _durationMs = value.clamp(1, 600000).toInt();
-    if (_positionMs > _durationMs) _positionMs = _durationMs;
+    durationMs = value.clamp(1, 600000).toInt();
+    if (_positionMs > durationMs) _positionMs = durationMs;
     notifyListeners();
   }
 
   void play() {
     if (_playing) return;
-    if (_positionMs >= _durationMs) _positionMs = 0;
+    if (_positionMs >= durationMs) _positionMs = 0;
     _playing = true;
-    _startPositionMs = _positionMs;
     _lastElapsed = Duration.zero;
     _ticker.start();
     notifyListeners();
@@ -58,8 +55,7 @@ class VideoPlaybackController extends ChangeNotifier {
   void toggle() => _playing ? pause() : play();
 
   void seek(int ms) {
-    _positionMs = ms.clamp(0, _durationMs).toInt();
-    _startPositionMs = _positionMs;
+    _positionMs = ms.clamp(0, durationMs).toInt();
     _lastElapsed = Duration.zero;
     notifyListeners();
   }
@@ -69,13 +65,12 @@ class VideoPlaybackController extends ChangeNotifier {
     if (delta <= 0) return;
     _lastElapsed = elapsed;
     var next = _positionMs + delta;
-    if (next >= _durationMs) {
+    if (next >= durationMs) {
       if (loop) {
-        next %= _durationMs;
-        _startPositionMs = 0;
+        next %= durationMs;
         _lastElapsed = elapsed;
       } else {
-        next = _durationMs;
+        next = durationMs;
         _ticker.stop();
         _playing = false;
       }

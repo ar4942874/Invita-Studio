@@ -171,17 +171,18 @@ and the dialog explains that preview and timing still work.
 | Reference render of a 15 s / 1080 × 1920 / 30 fps invitation (artwork + 10 animated layers) | Playable MP4; ffmpeg decodes **450 video frames**, duration **15.00 s** |
 | Silent and music variants | Silent variant has no audio stream; music variant has AAC-LC 44.1 kHz stereo, mean volume −23.2 dB, peak −13.6 dB |
 | Container flags | `ftyp isom`, `moov` before `mdat` (fast start), bt709 colour tags |
-| Project JSON round-trip / v1 migration / validation tests | Written (`test/video_project_test.dart`) — **not executed** |
-| Timeline evaluation, easing, frame-index tests | Written (`test/video_timeline_test.dart`) — **not executed** |
-| Media/manifest/frame-mapping/progress tests | Written (`test/video_media_test.dart`) — **not executed** |
+| Project JSON round-trip / v1 migration / validation tests | `test/video_project_test.dart` — pass on Flutter 3.47.7 / Dart 3.13.5 |
+| Timeline evaluation, easing, frame-index tests | `test/video_timeline_test.dart` — pass |
+| Media/manifest/frame-mapping/progress tests | `test/video_media_test.dart` — pass |
 
 ### Not executed (blockers)
 
-* `flutter pub get`, `flutter analyze`, `flutter test`, `flutter build` — no
-  Flutter/Dart SDK is obtainable in this sandbox (pub.dev, storage.googleapis.com
-  and dart.dev are unreachable; the Dart binary bundled inside the
-  `sass-embedded-linux-x64` npm package is an AOT runtime and cannot compile or
-  analyse Dart code).
+* `flutter pub get`, `flutter analyze`, `flutter test` and
+  `flutter build web --release` were later run on Flutter 3.47.7 / Dart 3.13.5:
+  analyze reports no errors and the video tests pass. The authoring sandbox that
+  produced this increment could reach no SDK (pub.dev,
+  storage.googleapis.com and dart.dev were unreachable), so those were verified
+  afterwards on the project machine rather than at authoring time.
 * Android build / emulator / device — no JDK, Android SDK or adb.
 * iOS build / simulator / device — no macOS or Xcode.
 * Native share sheets, iPad popover, receiving-app delivery, Photos/Files save.

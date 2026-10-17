@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
-import 'package:flutter_canvas_editor/src/canvas_editor/canvas_painter.dart';
 
 void main() {
   late DesignDocument doc;

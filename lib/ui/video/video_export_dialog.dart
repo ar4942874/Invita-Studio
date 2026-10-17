@@ -400,7 +400,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LinearProgressIndicator(value: progress?.fraction ?? null),
+        LinearProgressIndicator(value: progress?.fraction),
         const SizedBox(height: 6),
         Text(
           '${progress?.stage.label ?? 'Rendering'} · '
