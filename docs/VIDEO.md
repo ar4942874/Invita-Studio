@@ -220,14 +220,11 @@ from the managed directory, the browser returns in-memory PNG bytes.
 | Media/manifest/frame-mapping/progress tests | `test/video_media_test.dart` — pass |
 | Full suite (300 tests), web export/import/music wiring | `flutter analyze` clean, `flutter test` all pass, `flutter build web --release` succeeds |
 
-### Not executed (blockers)
+### Not executed (needs a real device or macOS/Windows toolchain)
 
-* `flutter pub get`, `flutter analyze`, `flutter test` and
-  `flutter build web --release` were later run on Flutter 3.47.7 / Dart 3.13.5:
-  analyze reports no errors and the video tests pass. The authoring sandbox that
-  produced this increment could reach no SDK (pub.dev,
-  storage.googleapis.com and dart.dev were unreachable), so those were verified
-  afterwards on the project machine rather than at authoring time.
+The Dart-side pipeline above was run and passes on Flutter 3.47.7 / Dart 3.13.5;
+the following each need hardware or a toolchain this environment does not have:
+
 * Android build / emulator / device — no JDK, Android SDK or adb.
 * iOS build / simulator / device — no macOS or Xcode.
 * Native share sheets, iPad popover, receiving-app delivery, Photos/Files save.
@@ -241,7 +238,7 @@ builds or that the native plugins ran.
 
 ### Required device checks before claiming completion
 
-1. `flutter pub get && flutter analyze && flutter test --concurrency=1 test packages/flutter_canvas_editor/test` on Flutter 3.47.7 / Dart 3.13.5.
+1. Re-run `flutter pub get && flutter analyze && flutter test --concurrency=1 test packages/flutter_canvas_editor/test` on Flutter 3.47.7 / Dart 3.13.5 against the release commit (currently analyzer-clean and 300 passing).
 2. Android device/emulator (API 24+): import a 10 s clip, export 15 s Story with music; verify with `ffprobe`/MediaInfo that it is H.264 + AAC, 450 frames, 1080 × 1920, 30 fps; confirm cancellation leaves no partial file.
 3. Repeat for Square and Classic, and for the 540 × 960 quality option.
 4. iOS 15+ device: same exports; confirm the second-pass mux keeps audio in sync and that the iPad share popover anchors to the Share button.

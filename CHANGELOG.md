@@ -1,3 +1,13 @@
+# Unreleased
+
+- Re-skinned the whole UI with the OpenDesign **premium** design system: warm canvas, graphite ink ramp, a single bronze accent, Cormorant Garamond / DM Sans, and adaptive desktop/tablet/mobile layouts.
+- Replaced the fixed three-template list with a per-celebration catalogue: ten motifs drawn in six category palettes (60 designs), plus the nine original layouts kept so old drafts still open and export.
+- Added a guided start (category → details → card) and one-tap whole-card video presets with slow ambient looping motion.
+- Enlarging a field now re-stacks the linked wording into one column so it never overlaps the field below or leaves the page.
+- Bundled a short generated tune per category and pre-select it when a project is created.
+- Added real browser video export through `MediaRecorder` (silent WebM/MP4), alongside the native H.264/AAC encoders.
+- `flutter analyze` clean and 300 tests passing on Flutter 3.47.7 / Dart 3.13.5.
+
 # 1.0.0 — image-first implementation
 
 - Integrated vendored BSD-3-Clause flutter_canvas_editor 1.2.0 into a real Flutter Android/iOS/web project.

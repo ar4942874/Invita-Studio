@@ -95,6 +95,6 @@ Playwright is an optional Apache-2.0 development dependency for browser QA, not 
 
 ## Original artwork and code
 
-The botanical branches, celestial linework, rosewater washes, brand icon, app workflow and host UI were created for this project. The original art generator is `tool/generate_art.py`; baked assets are included. These are not scraped invitation templates or copied art from an unlicensed sample app. App code/artwork use the root MIT license; the engine fork and fonts retain their separate licenses above.
+The botanical branches, celestial linework, rosewater washes, the category motifs, brand icon, app workflow and host UI were created for this project. The art generators are `tool/generate_art.py` (the original layouts) and `tool/generate_category_art.py` (the per-category catalogue); the bundled tunes were synthesized by `tool/generate_music.py`. All are baked into `assets/` here. These are not scraped invitation templates or copied art from an unlicensed sample app. App code/artwork use the root MIT license; the engine fork and fonts retain their separate licenses above.
 
 No Invitor source, stock music, proprietary editor, FFmpeg binary or GPL video package is included. Future photo, art, music or video additions require their own rights/license review.

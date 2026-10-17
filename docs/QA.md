@@ -2,18 +2,21 @@
 
 **Date:** 16 October 2026  
 **SDK:** Flutter 3.47.7 / Dart 3.13.5  
-**Environment:** Linux sandbox; real headless Chromium 156 via Playwright 1.64.1 for web checks.
+**Environment:** baseline browser checks on a Linux sandbox with real headless Chromium 156 via Playwright 1.64.1; the Flutter SDK runs (analyze/test/web build) on the project machine (Windows, PowerShell) with Flutter 3.47.7 / Dart 3.13.5.
 
-> **Scope note.** The table below is the recorded baseline for the image editor
-> (commit before the video increment). The video editor, MP4 exporter and both
-> native encoders were added afterwards and could **not** be built or run in
-> this sandbox: there is no Flutter/Dart SDK, JDK, Android SDK or Xcode, and
-> pub.dev / storage.googleapis.com are unreachable. The new Dart tests are
-> written but unexecuted. Read
-> [the video verification report](VIDEO.md) before treating any MP4 claim as
-> verified.
+> **Scope note.** The `Executed successfully` table below is the recorded
+> image-editor baseline (the commit before the video increment); its 12 + 7
+> browser checks were run against the compiled web build with headless
+> Chromium 156 via Playwright 1.64.1. The video editor, MP4 exporter and both
+> native encoders were added afterwards. The full Flutter suite — including the
+> video model/exporter tests — now runs and passes on the project machine
+> (Flutter 3.47.7 / Dart 3.13.5, **300 tests**), `flutter analyze` is clean and
+> `flutter build web` succeeds; see
+> [the video verification report](VIDEO.md). What is still **not** executed is
+> everything that needs a real device: no APK/IPA, no native encode, no share
+> sheet. Treat native-only MP4 claims as source-only until then.
 
-## Video increment (source added, not executed here)
+## Video increment (suite runs, native not executed here)
 
 | Check | Result |
 |---|---|
@@ -22,8 +25,8 @@
 | Reference render with music | AAC-LC 44.1 kHz stereo; mean −23.2 dB, peak −13.6 dB |
 | Reference render without music | No audio stream |
 | Container | `isom`, `moov` before `mdat`, bt709 tags |
-| Timeline / project / media tests (`test/video_*_test.dart`, 3 files) | **Not executed** — no Dart/Flutter SDK |
-| `flutter analyze`, `flutter test`, `flutter build` | **Not executed** |
+| Timeline / project / media tests (`test/video_*_test.dart`, 3 files) | **Pass** on Flutter 3.47.7 / Dart 3.13.5 |
+| `flutter analyze`, `flutter test`, `flutter build web --release` | **Pass** — analyzer clean, 300 tests, web release builds |
 | Android encoder, iOS encoder, share sheet, device playback | **Not executed** — no JDK/Android SDK/Xcode/device |
 
 The sample MP4s are produced by `tool/reference_sample.py`, a development-only
@@ -37,7 +40,8 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 |---|---|
 | Dependency resolution with `pubspec.lock` | Passed |
 | `flutter analyze` | **No issues found** |
-| `flutter test --concurrency=1 test packages/flutter_canvas_editor/test` | **64 passed** |
+| `flutter test --concurrency=1 test packages/flutter_canvas_editor/test` | **64 passed** (image-editor baseline) |
+| Full suite including the video tests, later run on the project machine | **300 passed** |
 | `flutter build web --release --no-web-resources-cdn --no-wasm-dry-run -O1` | **Built successfully** |
 | Real compiled-app browser workflow checks | **12 passed** |
 | Real compiled-app photo-card browser checks | **7 passed** |
@@ -120,7 +124,7 @@ The browser’s `force` click option bypasses DOM overlap checks on Flutter’s 
 - Full accessibility, collision detection, long-session performance, storage durability/security or print-prepress certification.
 - Photo cropping/filters and the cloud/RSVP backend.
 - Everything native about the video feature: Android/iOS compilation, MediaCodec/AVAssetWriter encode, background-clip extraction, music muxing, device playback, cancellation on device, share sheets and delivery. The code exists; the runs do not.
-- Audible music in the in-app preview (music is baked into the export only).
+- Audible music in the **native** in-app preview (native builds bake music into the export only; the browser preview plays it while the browser export stays silent).
 
 The first default build attempt ran parallel JavaScript/Wasm compilation and exceeded this 2 GB sandbox’s memory; it was stopped. The successfully built and browser-tested release uses JavaScript/O1 with the additional Wasm dry run disabled. Wasm output and O4 release performance were not validated.
 
