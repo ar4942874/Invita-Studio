@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo 'Skipping Node install; Flutter is provisioned in the build step.'",
+  "buildCommand": "bash scripts/vercel-build.sh",
+  "outputDirectory": "build/web"
+}

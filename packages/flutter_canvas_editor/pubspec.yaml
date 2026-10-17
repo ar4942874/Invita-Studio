@@ -1,0 +1,24 @@
+name: flutter_canvas_editor
+description: "A canvas-based template editor engine for Flutter."
+version: 1.2.0
+homepage: https://github.com/developer-estatic/canvas_editor
+repository: https://github.com/developer-estatic/canvas_editor
+issue_tracker: https://github.com/developer-estatic/canvas_editor/issues
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_bloc: ^9.0.0
+  equatable: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

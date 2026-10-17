@@ -1,0 +1,43 @@
+{
+  "origin": "http://127.0.0.1:8080",
+  "checks": [
+    "Flutter release boots with local renderer, fonts and artwork",
+    "Guided fields update the editable document and autosave",
+    "Template + Story reflow retains names and venue",
+    "Browser downloads genuine 2x Story JPEG",
+    "Unsupported browser sharing fails clearly, without pretending to send",
+    "Editable project JSON download contains the actual edited layers",
+    "Reload restores the locally saved invitation",
+    "Project JSON imports into a clean browser session as editable layers",
+    "Imported text layers can be selected for styling",
+    "390px mobile Details sheet edits the real document",
+    "320px mobile export downloads genuine 2x Square PNG",
+    "No uncaught browser errors or external network dependencies"
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "blockedExternalRequests": [],
+  "downloads": [
+    {
+      "file": "classic-2160x3024.png",
+      "suggestedName": "ayesha-hamza-2160x3024.png",
+      "bytes": 658702
+    },
+    {
+      "file": "story-2160x3840.jpg",
+      "suggestedName": "ayesha-hamza-2160x3840.jpg",
+      "bytes": 459603
+    },
+    {
+      "file": "edited.invita.json",
+      "suggestedName": "p_1792182508355000.invita.json",
+      "bytes": 6787
+    },
+    {
+      "file": "square-2160x2160.png",
+      "suggestedName": "ayesha-hamza-2160x2160.png",
+      "bytes": 660901
+    }
+  ],
+  "passed": true
+}

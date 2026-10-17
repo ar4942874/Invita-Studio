@@ -1,0 +1,46 @@
+name: invitation_studio
+description: An open-source, image-first Flutter invitation studio.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_canvas_editor:
+    path: packages/flutter_canvas_editor
+  cupertino_icons: ^1.0.8
+  image: ^4.12.0
+  shared_preferences: ^2.5.6
+  share_plus: ^13.3.1
+  cross_file: ^0.3.5+5
+  file_selector: ^1.1.0
+  path_provider: ^2.1.6
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/art/
+    - assets/fonts/CormorantGaramond-OFL.txt
+    - assets/fonts/DMSans-OFL.txt
+    - assets/fonts/NotoNaskhArabic-OFL.txt
+  fonts:
+    - family: CormorantGaramond
+      fonts:
+        - asset: assets/fonts/CormorantGaramond.ttf
+        - asset: assets/fonts/CormorantGaramond-Italic.ttf
+          style: italic
+    - family: DMSans
+      fonts:
+        - asset: assets/fonts/DMSans.ttf
+    - family: NotoNaskhArabic
+      fonts:
+        - asset: assets/fonts/NotoNaskhArabic.ttf

@@ -1,0 +1,26 @@
+[
+  {
+    "path": "examples/exports/botanical-classic-2160x3024.png",
+    "format": "PNG",
+    "width": 2160,
+    "height": 3024,
+    "bytes": 658702,
+    "sha256": "fc5fb93b061c0ac4e7a25333ac60c1fa9a4977d04f6735a554ca4027dd16a67e"
+  },
+  {
+    "path": "examples/exports/after-dark-story-2160x3840.jpg",
+    "format": "JPEG",
+    "width": 2160,
+    "height": 3840,
+    "bytes": 459603,
+    "sha256": "bde9d15dfb4f532a2661213e565594b792d58b9eb09ee666e1746d0134a31438"
+  },
+  {
+    "path": "examples/exports/rosewater-square-2160x2160.png",
+    "format": "PNG",
+    "width": 2160,
+    "height": 2160,
+    "bytes": 660901,
+    "sha256": "1227a0c781a058b794d289ccb1c98c88aa7ea39275ec14beb960ddffe6c335d8"
+  }
+]

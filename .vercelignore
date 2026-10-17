@@ -1,0 +1,11 @@
+# Keep the upload small; the build only needs lib/, assets/, packages/, web/.
+build/
+.dart_tool/
+.flutter/
+.pub-cache/
+tool/
+docs/
+examples/
+artifacts/
+test/
+*.log

@@ -1,0 +1,14 @@
+{
+  "origin": "http://127.0.0.1:8080",
+  "checks": [
+    "Browser imports a local photo as an editable image layer",
+    "Photo inspector appears for the selected layer",
+    "Photo fill mode updates and persists",
+    "Export renders the photo into the PNG",
+    "Exported project JSON embeds the photo layer",
+    "Reload restores the saved photo",
+    "No uncaught browser errors or external network dependencies"
+  ],
+  "pageErrors": [],
+  "blockedExternalRequests": []
+}

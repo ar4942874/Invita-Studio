@@ -1,0 +1,20 @@
+{
+  "package": "flutter_canvas_editor",
+  "version": "1.2.0",
+  "repository": "https://github.com/developer-estatic/canvas_editor",
+  "archive_url": "https://pub.dev/api/archives/flutter_canvas_editor-1.2.0.tar.gz",
+  "archive_sha256": "f26be63f9e044564ce440588e28d7165edb3c50f572e81a895826c0495ce90d6",
+  "license": "BSD-3-Clause",
+  "changed_dart_files": [
+    "lib/flutter_canvas_editor.dart",
+    "lib/src/canvas_editor/canvas_editor.dart",
+    "lib/src/canvas_editor/canvas_painter.dart",
+    "lib/src/controller/canvas_editor_controller.dart",
+    "lib/src/editor/bloc/editor_bloc.dart",
+    "lib/src/renderer/text_renderer/text_measurement_service.dart",
+    "lib/src/shared/image_load_path.dart",
+    "lib/src/shared/text_direction.dart",
+    "lib/src/widgets/canvas_editor_widget.dart",
+    "test/design_document_json_test.dart"
+  ]
+}

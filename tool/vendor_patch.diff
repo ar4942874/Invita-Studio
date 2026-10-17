@@ -1,0 +1,685 @@
+--- a/lib/flutter_canvas_editor.dart
++++ b/lib/flutter_canvas_editor.dart
+@@ -9,6 +9,7 @@
+ library;
+ 
+ export 'src/shared/image_load_path.dart';
++export 'src/shared/text_direction.dart';
+ export 'src/controller/canvas_editor_controller.dart';
+ export 'src/controller/canvas_editor_state.dart';
+ export 'src/widgets/canvas_editor_widget.dart';
+--- a/lib/src/canvas_editor/canvas_editor.dart
++++ b/lib/src/canvas_editor/canvas_editor.dart
+@@ -1,6 +1,7 @@
+ import 'dart:ui' as ui;
+ import 'dart:math' as math;
+ import 'package:flutter/material.dart';
++import 'package:flutter/gestures.dart';
+ import 'package:flutter_bloc/flutter_bloc.dart';
+ import '../document/document_color.dart';
+ import '../document/models/design_document.dart';
+@@ -9,17 +10,20 @@
+ import '../theme/canvas_theme.dart';
+ import '../extensions/custom_node_type.dart';
+ import '../shared/image_load_path.dart';
++import '../shared/text_direction.dart';
+ import '../renderer/text_renderer/text_reflow.dart';
+ import 'canvas_painter.dart';
+ 
+ class CanvasEditor extends StatefulWidget {
+   final CanvasTheme theme;
++  final double viewportPadding;
+   final CanvasImageProvider? imageProvider;
+   final CustomNodeRegistry customNodes;
+ 
+   CanvasEditor({
+     super.key,
+     this.theme = const CanvasTheme(),
++    this.viewportPadding = 20,
+     this.imageProvider,
+     CustomNodeRegistry? customNodes,
+   }) : customNodes = customNodes ?? CustomNodeRegistry();
+@@ -34,6 +38,7 @@
+ 
+   // Interaction state
+   bool _isDragging = false;
++  String? _interactionNodeId;
+   bool _isResizing = false;
+   bool _isRotating = false;
+   String? _resizeAnchor;
+@@ -64,6 +69,16 @@
+   }
+ 
+   @override
++  void initState() {
++    super.initState();
++    _textFocusNode.addListener(() {
++      if (!_textFocusNode.hasFocus && _textEditingNodeId != null && mounted) {
++        _stopTextEditing();
++      }
++    });
++  }
++
++  @override
+   void dispose() {
+     _textController.dispose();
+     _textFocusNode.dispose();
+@@ -85,7 +100,10 @@
+       ref: ref,
+       imageProvider: widget.imageProvider,
+     ).then((image) {
+-      if (!mounted) return;
++      if (!mounted) {
++        image?.dispose();
++        return;
++      }
+       setState(() {
+         _loadingImages.remove(key);
+         if (image != null) {
+@@ -96,6 +114,19 @@
+   }
+ 
+   void _preloadDocumentImages(DesignDocument doc) {
++    final needed = <String?>{};
++    for (final node in doc.nodes) {
++      if (node is ImageNode) {
++        needed.add(CanvasImageReference.fromImageNode(node).cacheKey);
++      }
++      if (node is BackgroundNode) {
++        needed.add(CanvasImageReference.fromBackgroundNode(node).cacheKey);
++      }
++    }
++    for (final key
++        in _imageCache.keys.where((key) => !needed.contains(key)).toList()) {
++      _imageCache.remove(key)?.dispose();
++    }
+     for (final node in doc.nodes) {
+       if (node is ImageNode) {
+         final ref = CanvasImageReference.fromImageNode(node);
+@@ -114,9 +145,11 @@
+ 
+     return LayoutBuilder(
+       builder: (context, constraints) {
+-        final scaleX = (constraints.maxWidth - 40) / doc.width;
+-        final scaleY = (constraints.maxHeight - 40) / doc.height;
+-        final autoScale = scaleX < scaleY ? scaleX : scaleY;
++        final scaleX =
++            (constraints.maxWidth - widget.viewportPadding * 2) / doc.width;
++        final scaleY =
++            (constraints.maxHeight - widget.viewportPadding * 2) / doc.height;
++        final autoScale = math.max(0.001, math.min(scaleX, scaleY));
+         final viewW = doc.width * autoScale;
+         final viewH = doc.height * autoScale;
+         final offset = Offset(
+@@ -137,11 +170,13 @@
+         return Stack(
+           children: [
+             GestureDetector(
++              dragStartBehavior: DragStartBehavior.down,
+               onTapUp: (details) => _handleTap(details, bloc, coords),
+               onPanStart: (details) =>
+                   _handlePanStart(details, bloc, coords, state),
+               onPanUpdate: (details) => _handlePanUpdate(details, bloc, coords),
+               onPanEnd: (_) => _handlePanEnd(bloc),
++              onPanCancel: () => _handlePanEnd(bloc),
+               child: ClipRRect(
+                 borderRadius: BorderRadius.circular(2),
+                 child: SizedBox(
+@@ -152,7 +187,7 @@
+                       document: doc,
+                       coords: coords,
+                       selectedNodeId: state.selectedNodeId,
+-                      imageCache: _imageCache,
++                      imageCache: Map.unmodifiable(_imageCache),
+                       theme: widget.theme,
+                       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+                       editingNodeId: _textEditingNodeId,
+@@ -226,6 +261,7 @@
+       textBaseline: TextBaseline.alphabetic,
+       color: color,
+       fontFamily: textNode.fontFamily,
++      fontFamilyFallback: const ['NotoNaskhArabic'],
+       fontSize: textNode.fontSize * coords.viewportScale,
+       fontWeight: _fontWeight(textNode.fontWeight),
+       height: textNode.lineHeight,
+@@ -257,6 +293,14 @@
+             focusNode: _textFocusNode,
+             autofocus: true,
+             maxLines: null,
++            maxLength: 500,
++            buildCounter:
++                (
++                  context, {
++                  required currentLength,
++                  required isFocused,
++                  required maxLength,
++                }) => null,
+             textInputAction: TextInputAction.done,
+             textAlignVertical: TextAlignVertical.top,
+             scrollPadding: EdgeInsets.zero,
+@@ -265,6 +309,7 @@
+             strutStyle: StrutStyle.disabled,
+             style: style,
+             textAlign: _textAlign(textNode.textAlign),
++            textDirection: invitationTextDirection(textNode.text),
+             decoration: const InputDecoration.collapsed(hintText: ''),
+             onChanged: (value) {
+               bloc.add(
+@@ -336,6 +381,7 @@
+   ) {
+     // Ensure a clean interaction state for each new gesture
+     _isDragging = false;
++    _interactionNodeId = null;
+     _isResizing = false;
+     _isRotating = false;
+     _resizeAnchor = null;
+@@ -353,41 +399,44 @@
+     final screenPt =
+         details.globalPosition - renderBox.localToGlobal(Offset.zero);
+ 
+-    final selectedNodeId = state.selectedNodeId;
+-    if (selectedNodeId == null) {
+-      final hit = CanvasHitTest.hitTestNode(screenPt, doc, coords);
+-      if (hit != null) {
+-        bloc.add(SelectNodeEvent(hit.id));
+-      }
++    final selected = doc.nodes
++        .where((n) => n.id == state.selectedNodeId)
++        .firstOrNull;
++    // Existing selection handles take priority over overlapping text.
++    if (selected != null) {
++      if (CanvasHitTest.hitTestRotationHandle(screenPt, selected, coords)) {
++        _isRotating = true;
++        _interactionStartDoc = coords.screenToDoc(screenPt);
++        _startRotation = selected.rotation;
++        _gestureUndoSnapshot = state.document;
++        return;
++      }
++      final anchor = CanvasHitTest.hitTestResizeHandle(
++        screenPt,
++        selected,
++        coords,
++      );
++      if (anchor != null) {
++        _isResizing = true;
++        _resizeAnchor = anchor;
++        _interactionStartDoc = coords.screenToDoc(screenPt);
++        _startFrame = selected.frame;
++        _gestureUndoSnapshot = state.document;
++        return;
++      }
++    }
++    // A first drag selects AND moves the hit layer. Dragging another layer
++    // must not move the previously selected one; empty paper clears selection.
++    final hit = CanvasHitTest.hitTestNode(screenPt, doc, coords);
++    if (hit == null) {
++      bloc.add(const SelectNodeEvent(null));
+       return;
+     }
+-
+-    final node = doc.nodes.firstWhere((n) => n.id == selectedNodeId);
+-
+-    // Check rotation handle
+-    if (CanvasHitTest.hitTestRotationHandle(screenPt, node, coords)) {
+-      _isRotating = true;
+-      _interactionStartDoc = coords.screenToDoc(screenPt);
+-      _startRotation = node.rotation;
+-      _gestureUndoSnapshot = state.document;
+-      return;
+-    }
+-
+-    // Check resize handles (side for Text Node, corners for others)
+-    final anchor = CanvasHitTest.hitTestResizeHandle(screenPt, node, coords);
+-    if (anchor != null) {
+-      _isResizing = true;
+-      _resizeAnchor = anchor;
+-      _interactionStartDoc = coords.screenToDoc(screenPt);
+-      _startFrame = node.frame;
+-      _gestureUndoSnapshot = state.document;
+-      return;
+-    }
+-
+-    // Default: drag node
++    if (hit.id != state.selectedNodeId) bloc.add(SelectNodeEvent(hit.id));
+     _isDragging = true;
++    _interactionNodeId = hit.id;
+     _interactionStartDoc = coords.screenToDoc(screenPt);
+-    _startFrame = node.frame;
++    _startFrame = hit.frame;
+     _gestureUndoSnapshot = state.document;
+   }
+ 
+@@ -418,6 +467,7 @@
+     }
+ 
+     _isDragging = false;
++    _interactionNodeId = null;
+     _isResizing = false;
+     _isRotating = false;
+     // Reset interaction helpers
+@@ -434,7 +484,7 @@
+     CoordinateSystem coords,
+   ) {
+     final state = bloc.state;
+-    final selectedId = state.selectedNodeId;
++    final selectedId = _interactionNodeId ?? state.selectedNodeId;
+     if (selectedId == null ||
+         _startFrame == null ||
+         _interactionStartDoc == null) {
+--- a/lib/src/canvas_editor/canvas_painter.dart
++++ b/lib/src/canvas_editor/canvas_painter.dart
+@@ -4,6 +4,7 @@
+ import '../document/document_color.dart';
+ import '../document/models/design_document.dart';
+ import '../shared/image_load_path.dart';
++import '../shared/text_direction.dart';
+ import '../renderer/coordinate_system.dart';
+ import '../theme/canvas_theme.dart';
+ 
+@@ -72,6 +73,7 @@
+       final textStyle = TextStyle(
+         color: _parseHex(node.textColor),
+         fontFamily: node.fontFamily,
++        fontFamilyFallback: const ['NotoNaskhArabic'],
+         fontSize: node.fontSize * coords.viewportScale,
+         fontWeight: _fontWeight(node.fontWeight),
+         height: node.lineHeight,
+@@ -79,11 +81,12 @@
+       );
+       final tp = TextPainter(
+         text: TextSpan(text: node.text, style: textStyle),
+-        textDirection: TextDirection.ltr,
++        textDirection: invitationTextDirection(node.text),
+         textAlign: _textAlign(node.textAlign),
+       );
+-      tp.layout(maxWidth: screenRect.width);
++      tp.layout(minWidth: screenRect.width, maxWidth: screenRect.width);
+       tp.paint(canvas, screenRect.topLeft);
++      tp.dispose();
+     } else if (node is ImageNode) {
+       final ref = CanvasImageReference.fromImageNode(node);
+       final cached = ref.cacheKey != null ? imageCache[ref.cacheKey] : null;
+@@ -141,6 +144,7 @@
+         ..filterQuality = FilterQuality.high,
+     );
+     image.dispose();
++    picture.dispose();
+   }
+ 
+   Rect _selectionOverlayBounds(Rect screenRect, double rotationDeg) {
+@@ -312,7 +316,14 @@
+   void _drawImage(Canvas canvas, ui.Image image, Rect dest, String fit) {
+     final srcSize = Size(image.width.toDouble(), image.height.toDouble());
+     final srcRect = _srcRectForFit(srcSize, dest.size, fit);
+-    canvas.drawImageRect(image, srcRect, dest, Paint()..isAntiAlias = true);
++    canvas.drawImageRect(
++      image,
++      srcRect,
++      dest,
++      Paint()
++        ..isAntiAlias = true
++        ..filterQuality = FilterQuality.medium,
++    );
+   }
+ 
+   Rect _srcRectForFit(Size src, Size dest, String fit) {
+@@ -333,6 +344,8 @@
+   @override
+   bool shouldRepaint(covariant CanvasPainter old) =>
+       old.document != document ||
++      old.imageCache.length != imageCache.length ||
++      imageCache.entries.any((e) => old.imageCache[e.key] != e.value) ||
+       old.selectedNodeId != selectedNodeId ||
+       old.coords.viewportScale != coords.viewportScale ||
+       old.coords.viewportOffset != coords.viewportOffset ||
+--- a/lib/src/controller/canvas_editor_controller.dart
++++ b/lib/src/controller/canvas_editor_controller.dart
+@@ -129,11 +129,15 @@
+   /// Used by [CanvasEditorWidget] only — not part of the Host command API.
+   ///
+   /// @nodoc
+-  Widget buildCanvas({CanvasTheme theme = const CanvasTheme()}) {
++  Widget buildCanvas({
++    CanvasTheme theme = const CanvasTheme(),
++    double viewportPadding = 20,
++  }) {
+     return BlocProvider<EditorBloc>.value(
+       value: _bloc,
+       child: CanvasEditor(
+         theme: theme,
++        viewportPadding: viewportPadding,
+         imageProvider: imageProvider,
+         customNodes: customNodeRegistry,
+       ),
+@@ -308,6 +312,27 @@
+     _bloc.add(LoadDocumentEvent(doc));
+   }
+ 
++  /// Apply a host-owned document change atomically, preserving undo history.
++  /// Completes after the editor has applied the update, not merely enqueued it.
++  Future<void> applyDocument(
++    DesignDocument replacement, {
++    bool recordUndo = true,
++    bool clearSelection = false,
++    String? selectNodeId,
++  }) {
++    final done = Completer<void>();
++    _bloc.add(
++      ApplyDocumentEvent(
++        replacement,
++        recordUndo: recordUndo,
++        clearSelection: clearSelection,
++        selectNodeId: selectNodeId,
++        onComplete: done.complete,
++      ),
++    );
++    return done.future;
++  }
++
+   /// Parses JSON with this Controller's [customNodeRegistry].
+   DesignDocument documentFromJson(Map<String, dynamic> json) {
+     return DesignDocument.fromJson(json, customNodes: customNodeRegistry);
+@@ -315,48 +340,77 @@
+ 
+   /// Renders the current Design Document to PNG bytes (same pipeline as the live canvas).
+   Future<Uint8List> exportToPng({double pixelRatio = 2.0}) async {
+-    final width = (document.width * pixelRatio).toInt();
+-    final height = (document.height * pixelRatio).toInt();
+-
+-    final recorder = ui.PictureRecorder();
+-    final canvas = Canvas(recorder);
+-
+-    final coords = CoordinateSystem(
+-      width: document.width,
+-      height: document.height,
+-      viewportScale: pixelRatio,
+-      viewportOffset: Offset.zero,
+-    );
+-
+-    // Load images via Image Load Path (localPath, then imageProvider for Asset Id)
+-    final cachedImages = await CanvasImageLoader.buildCacheForDocument(
+-      document: document,
+-      imageProvider: imageProvider,
+-    );
+-
+-    final painter = CanvasPainter(
+-      document: document,
+-      coords: coords,
+-      imageCache: cachedImages,
+-    );
+-
+-    painter.paint(canvas, Size(width.toDouble(), height.toDouble()));
+-
+-    final picture = recorder.endRecording();
+-    final img = await picture.toImage(width, height);
+-    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+-
+-    // Clean up images
+-    for (final image in cachedImages.values) {
+-      image.dispose();
+-    }
+-    img.dispose();
+-    picture.dispose();
+-
+-    if (byteData == null) {
+-      throw Exception('Failed to generate PNG byte data');
+-    }
+-    return byteData.buffer.asUint8List();
++    // Capture BEFORE the first await: typing during image loading must not
++    // change the export or mix two document versions.
++    final snapshot = document.copyWith(
++      nodes: List.unmodifiable(document.nodes),
++    );
++    if (!pixelRatio.isFinite ||
++        pixelRatio <= 0 ||
++        !snapshot.width.isFinite ||
++        !snapshot.height.isFinite ||
++        snapshot.width <= 0 ||
++        snapshot.height <= 0) {
++      throw ArgumentError(
++        'Export scale and document dimensions must be positive and finite.',
++      );
++    }
++    final width = (snapshot.width * pixelRatio).round();
++    final height = (snapshot.height * pixelRatio).round();
++    if (width < 1 ||
++        height < 1 ||
++        width > 16384 ||
++        height > 16384 ||
++        width * height > 16777216) {
++      throw ArgumentError('Export exceeds the 16-megapixel safety limit.');
++    }
++    Map<String, ui.Image> images = {};
++    ui.Picture? picture;
++    ui.Image? image;
++    try {
++      images = await CanvasImageLoader.buildCacheForDocument(
++        document: snapshot,
++        imageProvider: imageProvider,
++      );
++      for (final node in snapshot.nodes) {
++        final ref = node is ImageNode
++            ? CanvasImageReference.fromImageNode(node)
++            : node is BackgroundNode && node.hasBackgroundImage
++            ? CanvasImageReference.fromBackgroundNode(node)
++            : null;
++        if (ref != null && !ref.isEmpty && !images.containsKey(ref.cacheKey)) {
++          throw StateError(
++            'An invitation image could not be loaded. Export was stopped rather than saving a placeholder.',
++          );
++        }
++      }
++      final recorder = ui.PictureRecorder();
++      final canvas = Canvas(recorder);
++      final coords = CoordinateSystem(
++        width: snapshot.width,
++        height: snapshot.height,
++        viewportScale: pixelRatio,
++        viewportOffset: Offset.zero,
++      );
++      CanvasPainter(
++        document: snapshot,
++        coords: coords,
++        imageCache: images,
++      ).paint(canvas, Size(width.toDouble(), height.toDouble()));
++      picture = recorder.endRecording();
++      image = await picture.toImage(width, height);
++      final data = await image.toByteData(format: ui.ImageByteFormat.png);
++      if (data == null) throw StateError('Could not encode this invitation.');
++      return Uint8List.fromList(
++        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
++      );
++    } finally {
++      image?.dispose();
++      picture?.dispose();
++      for (final cached in images.values) {
++        cached.dispose();
++      }
++    }
+   }
+ 
+   /// Releases streams and internal Engine resources. Call from Host `dispose`.
+--- a/lib/src/editor/bloc/editor_bloc.dart
++++ b/lib/src/editor/bloc/editor_bloc.dart
+@@ -165,6 +165,32 @@
+ 
+ class RedoEvent extends EditorEvent {
+   const RedoEvent();
++}
++
++/// Atomic host change. Keeps related invitation fields in one undo step.
++class ApplyDocumentEvent extends EditorEvent {
++  final DesignDocument document;
++  final bool recordUndo;
++  final bool clearSelection;
++  final String? selectNodeId;
++  final void Function() onComplete;
++
++  const ApplyDocumentEvent(
++    this.document, {
++    required this.recordUndo,
++    required this.clearSelection,
++    this.selectNodeId,
++    required this.onComplete,
++  });
++
++  @override
++  List<Object?> get props => [
++    document,
++    recordUndo,
++    clearSelection,
++    selectNodeId,
++    onComplete,
++  ];
+ }
+ 
+ // --- STATE ---
+@@ -222,6 +248,16 @@
+   EditorBloc(DesignDocument initialDoc)
+     : super(EditorState(document: initialDoc)) {
+     on<LoadDocumentEvent>(_onLoadDocument);
++    on<ApplyDocumentEvent>((event, emit) {
++      _updateDocumentAndPushUndo(
++        emit,
++        event.document,
++        recordUndo: event.recordUndo,
++        selectNodeId: event.selectNodeId,
++        clearSelection: event.clearSelection,
++      );
++      event.onComplete();
++    });
+     on<UpdateNodeFrameEvent>(_onUpdateNodeFrame);
+     on<UpdateNodeTextEvent>(_onUpdateNodeText);
+     on<UpdateBackgroundColorEvent>(_onUpdateBackgroundColor);
+--- a/lib/src/renderer/text_renderer/text_measurement_service.dart
++++ b/lib/src/renderer/text_renderer/text_measurement_service.dart
+@@ -1,4 +1,5 @@
+ import 'package:flutter/material.dart';
++import '../../shared/text_direction.dart';
+ 
+ class TextMeasurementService {
+   static const double _minWidth = 30.0;
+@@ -22,6 +23,7 @@
+       text: text,
+       style: TextStyle(
+         fontFamily: fontFamily,
++        fontFamilyFallback: const ['NotoNaskhArabic'],
+         fontSize: fontSize,
+         fontWeight: _getFontWeight(fontWeight),
+         height: lineHeight,
+@@ -31,16 +33,18 @@
+ 
+     final textPainter = TextPainter(
+       text: textSpan,
+-      textDirection: TextDirection.ltr,
++      textDirection: invitationTextDirection(text),
+       maxLines: null,
+     );
+ 
+     textPainter.layout(maxWidth: maxWidth);
+ 
+-    return Size(
++    final result = Size(
+       textPainter.width.clamp(_minWidth, double.infinity),
+       textPainter.height.clamp(_minHeight, double.infinity),
+     );
++    textPainter.dispose();
++    return result;
+   }
+ 
+   static FontWeight _getFontWeight(int weight) {
+--- a/lib/src/shared/image_load_path.dart
++++ b/lib/src/shared/image_load_path.dart
+@@ -64,8 +64,12 @@
+         final bytes = await readLocalFileBytes(ref.localPath!);
+         if (bytes != null) {
+           final codec = await ui.instantiateImageCodec(bytes);
+-          final frame = await codec.getNextFrame();
+-          return frame.image;
++          try {
++            final frame = await codec.getNextFrame();
++            return frame.image;
++          } finally {
++            codec.dispose();
++          }
+         }
+       } catch (_) {
+         // fall through to asset provider
+@@ -84,9 +88,12 @@
+       listener = ImageStreamListener(
+         (info, _) {
+           stream.removeListener(listener);
+-          completer.complete(info.image);
++          // Flutter's ImageCache owns info.image. Return our own handle so
++          // disposing an export does not invalidate the on-screen background.
++          completer.complete(info.image.clone());
++          info.dispose();
+         },
+-        onError: (_, __) {
++        onError: (_, _) {
+           stream.removeListener(listener);
+           completer.complete(null);
+         },
+--- /dev/null
++++ b/lib/src/shared/text_direction.dart
+@@ -0,0 +1,18 @@
++import 'dart:ui';
++
++/// First-strong direction for invitation text. Digits and punctuation are neutral.
++TextDirection invitationTextDirection(String text) {
++  for (final rune in text.runes) {
++    if ((rune >= 0x0590 && rune <= 0x08FF) ||
++        (rune >= 0xFB1D && rune <= 0xFDFF) ||
++        (rune >= 0xFE70 && rune <= 0xFEFF)) {
++      return TextDirection.rtl;
++    }
++    if ((rune >= 0x0041 && rune <= 0x005A) ||
++        (rune >= 0x0061 && rune <= 0x007A) ||
++        (rune >= 0x00C0 && rune <= 0x02AF)) {
++      return TextDirection.ltr;
++    }
++  }
++  return TextDirection.ltr;
++}
+--- a/lib/src/widgets/canvas_editor_widget.dart
++++ b/lib/src/widgets/canvas_editor_widget.dart
+@@ -13,11 +13,20 @@
+ 
+   /// Optional selection chrome styling. Defaults to [CanvasTheme] blues.
+   final CanvasTheme? theme;
++  final double viewportPadding;
+ 
+-  const CanvasEditorWidget({super.key, required this.controller, this.theme});
++  const CanvasEditorWidget({
++    super.key,
++    required this.controller,
++    this.theme,
++    this.viewportPadding = 20,
++  });
+ 
+   @override
+   Widget build(BuildContext context) {
+-    return controller.buildCanvas(theme: theme ?? const CanvasTheme());
++    return controller.buildCanvas(
++      theme: theme ?? const CanvasTheme(),
++      viewportPadding: viewportPadding,
++    );
+   }
+ }
+--- a/test/design_document_json_test.dart
++++ b/test/design_document_json_test.dart
+@@ -78,12 +78,12 @@
+       final typeA = CustomNodeType<TextNode>(
+         type: 'badge_a',
+         fromJson: TextNode.fromJson,
+-        builder: (_, __) => const SizedBox.shrink(),
++        builder: (_, _) => const SizedBox.shrink(),
+       );
+       final typeB = CustomNodeType<TextNode>(
+         type: 'badge_b',
+         fromJson: TextNode.fromJson,
+-        builder: (_, __) => const SizedBox.shrink(),
++        builder: (_, _) => const SizedBox.shrink(),
+       );
+ 
+       final a = CanvasEditorController(customNodeTypes: [typeA]);
