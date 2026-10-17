@@ -50,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _values
         ..clear()
         ..addAll(category.seedFields());
+      _template = templatesFor(category).first;
       _step = 1;
     });
   }
@@ -334,7 +335,10 @@ class _HomeScreenState extends State<HomeScreen> {
     children: [
       _heading(
         'Choose a card',
-        'Every design keeps your words. You can switch or restyle at any time.',
+        _category == null
+            ? 'Every design keeps your words. You can switch or restyle at any time.'
+            : 'Designs for a ${_category!.label.toLowerCase()}, plus our timeless '
+                  'favourites. Every design keeps your words.',
       ),
       LayoutBuilder(
         builder: (context, constraints) {
@@ -346,7 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
             spacing: gap,
             runSpacing: gap,
             children: [
-              for (final template in invitationTemplates)
+              for (final template
+                  in templatesFor(_category ?? InvitationCategory.wedding))
                 SizedBox(
                   width: width,
                   child: _CardTile(

@@ -48,7 +48,8 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 
 ## Flutter test coverage
 
-- All nine combinations of template and format: complete IDs, dimensions and editable project roundtrip.
+- Every design across all three formats (27 combinations): complete IDs, dimensions and editable project roundtrip.
+- Category-tagged designs sort ahead of the universal favourites and every bundled design ships art for each format plus a thumbnail.
 - Photo layers: downscale/encode preparation, add/select/fit/delete, persistence and rejection of remote references, filesystem paths, sub-background ordering and unknown fit modes.
 - Text fitting without ellipsis or loss of wording; basic first-strong direction cases.
 - Rejection of filesystem/remote image references, unknown node/font types, duplicate IDs, oversized canvases/fonts/input and missing linked fields.

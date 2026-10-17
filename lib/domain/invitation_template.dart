@@ -63,9 +63,9 @@ const invitationFields = [
 
 /// The kind of celebration, chosen on the home screen.
 ///
-/// A category seeds the wording and the project title. It does not change the
-/// bundled artwork: the same three designs are offered for every category until
-/// category-specific art is added.
+/// A category seeds the wording and the project title, and orders the designs
+/// offered on the card step: templates tagged for the category come first, the
+/// universal designs (see [InvitationTemplate.categories]) fill in the rest.
 enum InvitationCategory {
   wedding(
     'wedding',
@@ -197,9 +197,17 @@ class InvitationTemplate {
     this.ink,
     this.accent, {
     this.dark = false,
+    this.categories = const {},
   });
   final String id, name, caption, paper, ink, accent;
   final bool dark;
+
+  /// Celebrations this design was drawn for. Empty means it suits every
+  /// category and always appears on the card step.
+  final Set<InvitationCategory> categories;
+  bool suits(InvitationCategory category) =>
+      categories.isEmpty || categories.contains(category);
+
   String art(InvitationFormat format) => 'assets/art/${id}_${format.name}.png';
   String get thumbnail => 'assets/art/${id}_thumb.png';
 
@@ -365,6 +373,82 @@ const invitationTemplates = [
     '#FF69464F',
     '#FFA76F77',
   ),
+  InvitationTemplate(
+    'gilded',
+    'Gilded bloom',
+    'Luxe · gold foil',
+    '#FF0F2A26',
+    '#FFF6EFDC',
+    '#FFC8A24B',
+    dark: true,
+    categories: {InvitationCategory.wedding, InvitationCategory.anniversary},
+  ),
+  InvitationTemplate(
+    'terracotta',
+    'Terracotta',
+    'Warm · desert arch',
+    '#FFF7EFE7',
+    '#FF7A4A32',
+    '#FFC87F5A',
+    categories: {
+      InvitationCategory.wedding,
+      InvitationCategory.engagement,
+      InvitationCategory.other,
+    },
+  ),
+  InvitationTemplate(
+    'blush',
+    'Blush petals',
+    'Gentle · petals',
+    '#FFFDF0F2',
+    '#FF8A4A5A',
+    '#FFE39AA8',
+    categories: {
+      InvitationCategory.engagement,
+      InvitationCategory.anniversary,
+      InvitationCategory.babyShower,
+    },
+  ),
+  InvitationTemplate(
+    'confetti',
+    'Confetti pop',
+    'Playful · bright',
+    '#FFFFF8EC',
+    '#FF2E3A59',
+    '#FFF07A5F',
+    categories: {InvitationCategory.birthday, InvitationCategory.other},
+  ),
+  InvitationTemplate(
+    'littleone',
+    'Little one',
+    'Sweet · cloud nine',
+    '#FFEFF6FB',
+    '#FF4A6B86',
+    '#FFF2B8C6',
+    categories: {InvitationCategory.babyShower},
+  ),
+  InvitationTemplate(
+    'starlight',
+    'Starlight',
+    'Dreamy · night sky',
+    '#FF111A3A',
+    '#FFF3F1E7',
+    '#FFF0C878',
+    dark: true,
+    categories: {
+      InvitationCategory.babyShower,
+      InvitationCategory.birthday,
+    },
+  ),
+];
+
+/// Designs to offer on the card step for [category]: the category-specific art
+/// first, then the universal designs. Never empty.
+List<InvitationTemplate> templatesFor(InvitationCategory category) => [
+  ...invitationTemplates.where(
+    (t) => t.categories.isNotEmpty && t.suits(category),
+  ),
+  ...invitationTemplates.where((t) => t.categories.isEmpty),
 ];
 
 InvitationTemplate templateFor(DesignDocument doc) {

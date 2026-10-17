@@ -78,6 +78,8 @@ void main() {
     expect(find.text('Choose a card'), findsWidgets);
     await tester.tap(find.text(invitationTemplates.first.name).first);
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Create invitation'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Create invitation'));
     await tester.pumpAndSettle();
 

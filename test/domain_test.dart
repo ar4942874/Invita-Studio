@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:invitation_studio/domain/invitation_template.dart';
@@ -42,6 +43,37 @@ void main() {
       );
     }
   }
+  test('every bundled design ships art for each format and a thumbnail', () async {
+    for (final template in invitationTemplates) {
+      for (final format in InvitationFormat.values) {
+        final bytes = await rootBundle.load(template.art(format));
+        expect(bytes.lengthInBytes, greaterThan(0));
+      }
+      final thumb = await rootBundle.load(template.thumbnail);
+      expect(thumb.lengthInBytes, greaterThan(0));
+    }
+  });
+  group('category designs', () {
+    test('every category offers art and tagged designs sort ahead', () {
+      for (final category in InvitationCategory.values) {
+        final designs = templatesFor(category);
+        expect(designs, isNotEmpty);
+        expect(designs.first.suits(category), isTrue);
+        final firstUniversal = designs.indexWhere((t) => t.categories.isEmpty);
+        final lastTagged = designs.lastIndexWhere(
+          (t) => t.categories.isNotEmpty,
+        );
+        if (firstUniversal != -1 && lastTagged != -1) {
+          expect(lastTagged, lessThan(firstUniversal));
+        }
+      }
+    });
+    test('a birthday leads with playful art yet keeps the favourites', () {
+      final ids = templatesFor(InvitationCategory.birthday).map((t) => t.id);
+      expect(ids, contains('confetti'));
+      expect(ids, contains('botanical'));
+    });
+  });
   test('long names retain the full value and fit the frame', () {
     final doc = invitationTemplates.first.createDocument(
       documentId: 'long',

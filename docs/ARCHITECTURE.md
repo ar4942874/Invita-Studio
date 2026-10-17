@@ -13,7 +13,7 @@ The host is a Flutter application with a `ChangeNotifier` coordinator. No second
 | `lib/main.dart` | Binding, local font/license bootstrap, draft restore, initial artwork warm-up |
 | `lib/app.dart` | Standalone Material app |
 | `lib/invitation_studio.dart` | Public host integration exports |
-| `lib/domain/invitation_template.dart` | Field IDs, original template layouts, formats, text fitting, font definitions |
+| `lib/domain/invitation_template.dart` | Field IDs, category-tagged original template layouts, formats, text fitting, font definitions |
 | `lib/domain/project.dart` | Versioned project envelope (schema 2), v1 migration, guarded JSON import, effective video view |
 | `lib/domain/video/timeline.dart` | Flutter-free video model: duration, background clip, layer windows/effects, music, deterministic evaluation |
 | `lib/services/video/frame_renderer.dart` | Shared preview/export painter, clipped background-frame LRU, export frame feed |
