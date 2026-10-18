@@ -458,6 +458,69 @@ void main() {
       expect(decoded.motions, hasLength(ids.length));
       expect(decoded.motions['second']!.entrance.effect, MotionEffect.slideUp);
     });
+
+    test('spotlight lights up one layer after another within every limit', () {
+      for (final span in [5000, 8000, 15000, 30000]) {
+        final built = MotionPreset.spotlight.build(
+          layerIds: ids,
+          durationMs: span,
+        );
+        final delays = [
+          for (final id in ids) built[id]!.entrance.delayMs,
+        ];
+        expect(delays[0], 0);
+        if (ids.length > 1) {
+          expect(delays[1], greaterThan(delays[0]));
+          expect(delays[2], greaterThan(delays[1]));
+        }
+        for (final id in ids) {
+          final entrance = built[id]!.entrance;
+          expect(entrance.durationMs, 1200);
+          expect(
+            entrance.delayMs,
+            lessThanOrEqualTo(10000),
+            reason: 'the decoder rejects longer delays at $span ms',
+          );
+        }
+        final timeline = VideoTimeline(
+          enabled: true,
+          durationMs: span,
+          motions: built,
+        );
+        expect(timeline.validate(layerIds: ids.toSet()), isEmpty);
+        expect(
+          MotionPreset.detect(layerIds: ids, durationMs: span, motions: built),
+          MotionPreset.spotlight,
+        );
+      }
+    });
+
+    test('only the spotlight preset paints the starlit backdrop', () {
+      expect(MotionPreset.spotlight.backdrop, Backdrop.night);
+      expect(MotionPreset.slide.backdrop, Backdrop.plain);
+      expect(MotionPreset.none.backdrop, Backdrop.plain);
+    });
+  });
+
+  group('night backdrop', () {
+    test('defaults to plain and survives a JSON round-trip', () {
+      expect(VideoTimeline.decode(null).backdrop, Backdrop.plain);
+      expect(
+        VideoTimeline.decode({'durationMs': 12000, 'backdrop': 'night'})
+            .backdrop,
+        Backdrop.night,
+      );
+      expect(
+        VideoTimeline.decode({'durationMs': 12000, 'backdrop': 'nonsense'})
+            .backdrop,
+        Backdrop.plain,
+      );
+      const timeline = VideoTimeline(
+        durationMs: 12000,
+        backdrop: Backdrop.night,
+      );
+      expect(VideoTimeline.decode(timeline.toJson()).backdrop, Backdrop.night);
+    });
   });
 
   group('ambient motion', () {

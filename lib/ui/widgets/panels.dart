@@ -1128,7 +1128,7 @@ class _PhotoInspector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bytes = photoBytesFromDataUrl(photo.assetId);
+    final bytes = photoBytesCached(photo.assetId);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
       children: [

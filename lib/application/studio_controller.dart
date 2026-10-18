@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
@@ -647,7 +648,12 @@ class StudioController extends ChangeNotifier {
     if (document.nodes.length >= 50) {
       throw const FormatException('An invitation can hold up to 50 layers.');
     }
-    final photo = preparePhoto(bytes);
+    // Decode, resize and re-encode the photo. Large inputs do that work on a
+    // background isolate so the UI never stalls mid-typing; smaller ones
+    // finish faster synchronously than the isolate round-trip.
+    final photo = bytes.lengthInBytes >= photoIsolateMinBytes
+        ? await compute(preparePhoto, bytes)
+        : preparePhoto(bytes);
     final width = math.min(760.0, document.width * .72);
     final height = (width * photo.height / photo.width)
         .clamp(80.0, document.height)

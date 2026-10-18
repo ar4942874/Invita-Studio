@@ -13,7 +13,7 @@ BoxFit boxFitFromName(String fit) => switch (fit) {
 };
 
 Widget _photoImage(ImageNode node) {
-  final bytes = photoBytesFromDataUrl(node.assetId);
+  final bytes = photoBytesCached(node.assetId);
   if (bytes == null) {
     return const ColoredBox(
       color: Color(0x11000000),

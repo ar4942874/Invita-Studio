@@ -79,8 +79,34 @@ Uint8List? photoBytesFromDataUrl(String? assetId) {
 /// Whether [assetId] is an embedded photo this app is willing to load.
 bool isPhotoDataUrl(String? assetId) => _photoDataUrlHeader(assetId) != null;
 
+/// A bounded memo of decoded photo bytes keyed by the full data URL.
+///
+/// Thumbnails re-base64-decode megabytes on every widget rebuild otherwise;
+/// [photoBytesCached] keeps the last few around instead.
+final Map<String, Uint8List> _photoBytesCache = {};
+const int _photoBytesCacheLimit = 8;
+
+Uint8List? photoBytesCached(String? assetId) {
+  if (assetId == null || assetId.length > maxPhotoDataUrlBytes) return null;
+  final hit = _photoBytesCache[assetId];
+  if (hit != null) return hit;
+  final bytes = photoBytesFromDataUrl(assetId);
+  if (bytes == null) return null;
+  _photoBytesCache[assetId] = bytes;
+  while (_photoBytesCache.length > _photoBytesCacheLimit) {
+    _photoBytesCache.remove(_photoBytesCache.keys.first);
+  }
+  return bytes;
+}
+
+/// Photos above this size decode/resize/encode on a background isolate;
+/// smaller ones finish faster on the UI thread than the isolate round-trip.
+const int photoIsolateMinBytes = 256 * 1024;
+
 /// Decodes any supported image, downscales it and re-encodes it as a JPEG
 /// data URL. Throws [FormatException] when the file is not a usable image.
+/// Heavy for large inputs — callers with big byte arrays should run it via
+/// `compute` (see [photoIsolateMinBytes]).
 PreparedPhoto preparePhoto(Uint8List input) {
   if (input.isEmpty) {
     throw const FormatException('That photo is empty.');

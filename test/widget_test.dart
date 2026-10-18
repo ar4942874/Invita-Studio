@@ -9,6 +9,7 @@ import 'package:invitation_studio/domain/video/timeline.dart';
 import 'package:invitation_studio/services/bundled_fonts.dart'
     show loadStudioFonts;
 import 'package:invitation_studio/services/draft_store.dart';
+import 'package:invitation_studio/ui/video/video_workspace.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -176,6 +177,53 @@ void main() {
     expect(find.byTooltip('Pause'), findsOneWidget);
     expect(find.textContaining('System animations are off'), findsNothing);
     // Let the debounced autosave fire so no timer outlives the test.
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+  });
+  testWidgets('spotlight preset turns on the starlit scene in one tap', (
+    tester,
+  ) async {
+    final studio = await mount(tester, const Size(1440, 1000));
+    await tester.tap(find.text('Video'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final gallery = find.descendant(
+      of: find.byType(VideoWorkspace),
+      matching: find.byWidgetPredicate(
+        (w) => w is ListView && w.scrollDirection == Axis.horizontal,
+      ),
+    );
+    expect(gallery, findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Spotlight'),
+      gallery.first,
+      const Offset(-150, 0),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Spotlight'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 32));
+
+    expect(studio.video.backdrop, Backdrop.night);
+    expect(studio.video.ambient, AmbientMotion.drift);
+    final delays = [
+      for (final id in studio.project.layerIds)
+        studio.video.motionFor(id).entrance.delayMs,
+    ].toList()..sort();
+    expect(delays.first, 0);
+    expect(delays.last, greaterThan(delays.first));
+    // Normal machines auto-play the spotlighted sequence from zero.
+    expect(find.byTooltip('Pause'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Text && (w.data ?? '').startsWith('00:00.0 / '),
+      ),
+      findsOneWidget,
+    );
+
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
     await tester.pumpWidget(const SizedBox());

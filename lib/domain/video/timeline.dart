@@ -248,7 +248,8 @@ enum MotionPreset {
   floatIn('floatIn', 'Float', 'A gentle fade with a slow drift'),
   blinds('blinds', 'Slides and fades', 'Slides and fades mix in sequence'),
   shimmer('shimmer', 'Ripple', 'Zooms and fades ripple across the card'),
-  hover('hover', 'Drift zoom', 'A quiet zoom deepens the whole time');
+  hover('hover', 'Drift zoom', 'A quiet zoom deepens the whole time'),
+  spotlight('spotlight', 'Spotlight', 'One name at a time under a starlit sky');
 
   const MotionPreset(this.wireName, this.label, this.tagline);
   final String wireName;
@@ -464,6 +465,27 @@ enum MotionPreset {
               entrance(MotionEffect.zoomIn, easing: MotionEasing.linear),
             ),
         };
+      case MotionPreset.spotlight:
+        // Each layer lights up on its own: a longer fade per name, revealed
+        // one after another, so the focus clearly moves down the card. The
+        // stagger caps keep projects inside the decoder's 10 s delay limit.
+        final maxLast = (span - 1200).clamp(0, 10000).toInt();
+        final focusStep = count <= 1
+            ? 0
+            : (maxLast / (count - 1)).floor().clamp(0, 1000);
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: LayerMotion(
+              visibleStartMs: 0,
+              visibleEndMs: span,
+              entrance: Motion(
+                effect: MotionEffect.fade,
+                durationMs: 1200,
+                delayMs: (i * focusStep).clamp(0, maxLast).toInt(),
+                easing: MotionEasing.easeOut,
+              ),
+            ),
+        };
     }
   }
 
@@ -490,6 +512,13 @@ enum MotionPreset {
     MotionPreset.blinds => AmbientMotion.drift,
     MotionPreset.shimmer => AmbientMotion.breathe,
     MotionPreset.hover => AmbientMotion.zoom,
+    MotionPreset.spotlight => AmbientMotion.drift,
+  };
+
+  /// Scene dressing a preset turns on for the card.
+  Backdrop get backdrop => switch (this) {
+    MotionPreset.spotlight => Backdrop.night,
+    _ => Backdrop.plain,
   };
 
   /// Whether [motions] is exactly what this preset writes for [layerIds].
@@ -588,6 +617,28 @@ enum BackgroundKind {
       if (kind.wireName == value) return kind;
     }
     return null;
+  }
+}
+
+/// Optional scene dressing painted behind the layers.
+///
+/// `plain` keeps the artwork/clip as it is. `night` deepens the backdrop to
+/// near-black, sprinkles a deterministic twinkle of stars, and (while a layer's
+/// entrance is running) paints a soft pool of light behind it — the "Spotlight"
+/// look. Both preview and export paint the same deterministic field, so the
+/// MP4 always matches the preview.
+enum Backdrop {
+  plain('plain'),
+  night('night');
+
+  const Backdrop(this.wireName);
+  final String wireName;
+
+  static Backdrop fromWire(String? value) {
+    for (final backdrop in Backdrop.values) {
+      if (backdrop.wireName == value) return backdrop;
+    }
+    return Backdrop.plain;
   }
 }
 
@@ -809,6 +860,7 @@ class VideoTimeline {
     this.background = const VideoBackground(),
     this.motions = const {},
     this.ambient = AmbientMotion.none,
+    this.backdrop = Backdrop.plain,
     this.audio,
   });
 
@@ -824,6 +876,9 @@ class VideoTimeline {
 
   /// Looping motion that runs for the whole card, on top of the entrances.
   final AmbientMotion ambient;
+
+  /// Scene dressing behind the layers (plain artwork, or the starlit night).
+  final Backdrop backdrop;
   final VideoAudio? audio;
 
   int get fps => TimelineLimits.fps;
@@ -861,6 +916,7 @@ class VideoTimeline {
     VideoBackground? background,
     Map<String, LayerMotion>? motions,
     AmbientMotion? ambient,
+    Backdrop? backdrop,
     VideoAudio? audio,
     bool clearAudio = false,
   }) => VideoTimeline(
@@ -869,6 +925,7 @@ class VideoTimeline {
     background: background ?? this.background,
     motions: motions ?? this.motions,
     ambient: ambient ?? this.ambient,
+    backdrop: backdrop ?? this.backdrop,
     audio: clearAudio ? null : (audio ?? this.audio),
   );
 
@@ -936,6 +993,7 @@ class VideoTimeline {
       for (final entry in motions.entries) entry.key: entry.value.toJson(),
     },
     'ambient': ambient.wireName,
+    'backdrop': backdrop.wireName,
     'audio': audio?.toJson(),
   };
 
@@ -981,6 +1039,9 @@ class VideoTimeline {
       ambient: rawAmbient is String
           ? (AmbientMotion.fromWire(rawAmbient) ?? AmbientMotion.none)
           : AmbientMotion.none,
+      backdrop: raw['backdrop'] is String
+          ? Backdrop.fromWire(raw['backdrop'] as String)
+          : Backdrop.plain,
       audio: raw['audio'] == null ? null : VideoAudio.decode(raw['audio'], 'video.audio'),
     );
   }

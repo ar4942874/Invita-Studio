@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -182,6 +183,7 @@ class TimelineFrameRenderer {
     );
 
     // 1. Background colour + bundled artwork.
+    final frame = evaluateTimeline(timeline, layerIds, timeMs);
     final background = _background;
     if (background != null) {
       final backgroundOnly = document.copyWith(nodes: [background]);
@@ -204,14 +206,23 @@ class TimelineFrameRenderer {
       paintImageFitted(canvas, backgroundFrame, dest, timeline.background.fit);
     }
 
-    // 3. Animated layers.
-    final frame = evaluateTimeline(timeline, layerIds, timeMs);
+    // 2b. Starlit backdrop dressing behind the layers (Spotlight style).
+    if (timeline.backdrop == Backdrop.night) {
+      _paintNightBackdrop(canvas, size, scale, timeline, frame, timeMs);
+    }
+
+    // 3. Animated layers. On the starlit backdrop the text turns white so it
+    // reads against the near-black scene.
     final nodes = <DesignNode>[];
     final opacities = <String, double>{};
+    final night = timeline.backdrop == Backdrop.night;
     for (final node in _layers) {
       final visual = frame.visualFor(node.id);
       if (!visual.visible || visual.opacity <= 0.002) continue;
-      nodes.add(_withVisual(node, visual));
+      final layer = night && node is TextNode
+          ? node.copyWith(textColor: '#FFFFFFFF')
+          : node;
+      nodes.add(_withVisual(layer, visual));
       opacities[node.id] = visual.opacity;
     }
     if (nodes.isEmpty) return;
@@ -233,6 +244,94 @@ class TimelineFrameRenderer {
       scaleY: node.scaleY * visual.scale,
     );
   }
+
+  /// Deepens the artwork to near-black, twinkles a deterministic star field,
+  /// and — while one layer's entrance is running — pools a soft light behind
+  /// it, so the focus visibly travels name by name. Pure canvas math keyed to
+  /// [timeMs]: the preview and the export paint identical frames.
+  void _paintNightBackdrop(
+    ui.Canvas canvas,
+    ui.Size size,
+    double scale,
+    VideoTimeline timeline,
+    TimelineFrame frame,
+    int timeMs,
+  ) {
+    canvas.drawRect(
+      ui.Offset.zero & size,
+      ui.Paint()..color = const ui.Color(0xFF000000).withValues(alpha: 0.86),
+    );
+
+    final seconds = timeMs / 1000.0;
+    final starScale = scale.clamp(0.5, 3.0).toDouble();
+    for (var i = 0; i < 90; i++) {
+      final x = _unit01(i, 1) * size.width;
+      final y = _unit01(i, 2) * size.height;
+      final radius = (0.7 + 1.5 * _unit01(i, 3)) * starScale;
+      final twinkle = 0.5 +
+          0.5 * math.sin(math.pi * 2 * ((0.35 + 0.85 * _unit01(i, 4)) * seconds) + math.pi * 2 * _unit01(i, 5));
+      if (i % 11 == 0) {
+        // A brighter star with a soft halo.
+        canvas.drawCircle(
+          ui.Offset(x, y),
+          radius * 3.2,
+          ui.Paint()..color = _starBlue.withValues(alpha: 0.05 + 0.1 * twinkle),
+        );
+      }
+      final alpha = i % 11 == 0 ? 0.55 + 0.45 * twinkle : 0.25 + 0.6 * twinkle;
+      canvas.drawCircle(
+        ui.Offset(x, y),
+        radius,
+        ui.Paint()..color = _starWhite.withValues(alpha: alpha),
+      );
+    }
+
+    // Pool the light behind the layer that is appearing right now.
+    for (final node in _layers) {
+      final motion = timeline.motionFor(node.id);
+      final entrance = motion.entrance;
+      if (!entrance.isAnimated) continue;
+      final local =
+          timeMs - motion.visibleStartMs - entrance.delayMs;
+      if (local < 0 || local > entrance.durationMs) continue;
+      final visual = frame.visualFor(node.id);
+      if (!visual.visible || visual.opacity <= 0.002) continue;
+      final center = node.frame.center + visual.offset;
+      final glowCenter = ui.Offset(center.dx * scale, center.dy * scale);
+      final radius = size.height * 0.3;
+      final progress = local / entrance.durationMs;
+      final alpha = 0.3 * math.sin(progress * math.pi);
+      canvas.drawCircle(
+        glowCenter,
+        radius,
+        ui.Paint()
+          ..shader = ui.Gradient.radial(
+            glowCenter,
+            radius,
+            [_spotGlow.withValues(alpha: alpha), _spotGlow.withValues(alpha: 0)],
+            [0, 1],
+          ),
+      );
+      break;
+    }
+  }
+
+  static const ui.Color _starWhite = ui.Color(0xFFF2F7FF);
+  static const ui.Color _starBlue = ui.Color(0xFFBFD4FF);
+  static const ui.Color _spotGlow = ui.Color(0xFFF6E7B4);
+
+  static int _starHash(int n) {
+    var x = n & 0xFFFFFFFF;
+    x = (x ^ 61) ^ (x >> 16);
+    x = x + (x << 3);
+    x = x ^ (x >> 4);
+    x = x * 0x27d4eb2d;
+    x = x ^ (x >> 15);
+    return x & 0x7FFFFFFF;
+  }
+
+  static double _unit01(int i, int salt) =>
+      (_starHash(i * 131 + salt) & 0xFFFFFF) / 0xFFFFFF;
 }
 
 /// Draws [image] into [dest] using the same cover/contain/fill rules as the

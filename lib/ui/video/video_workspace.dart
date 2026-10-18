@@ -213,6 +213,7 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
           durationMs: timeline.durationMs,
         ),
         ambient: preset.ambient,
+        backdrop: preset.backdrop,
       ),
     );
     // Respect the OS/browser "reduce motion" setting: stay idle on the settled
@@ -1029,6 +1030,7 @@ IconData _presetIcon(MotionPreset preset) => switch (preset) {
   MotionPreset.blinds => Icons.table_rows,
   MotionPreset.shimmer => Icons.auto_fix_high,
   MotionPreset.hover => Icons.center_focus_weak,
+  MotionPreset.spotlight => Icons.highlight,
 };
 
 /// The layman-facing animation picker: one tap animates the whole card.

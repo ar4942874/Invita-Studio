@@ -79,6 +79,7 @@ class _StudioScreenState extends State<StudioScreen>
               durationMs: timeline.durationMs,
             ),
             ambient: MotionPreset.slide.ambient,
+            backdrop: MotionPreset.slide.backdrop,
           ),
         );
       } else {
