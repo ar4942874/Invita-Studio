@@ -219,6 +219,89 @@ void main() {
     await tester.pump();
   });
 
+  testWidgets('export dialog fits and switches formats on a phone', (
+    tester,
+  ) async {
+    setSize(tester, const Size(320, 568));
+    await mountEditor(tester);
+
+    await tester.ensureVisible(find.text('Export'));
+    final export = find.text('Export');
+    await tester.ensureVisible(export);
+    await tester.tap(export);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Ready for their inbox.'), findsOneWidget);
+    expect(find.text('PNG'), findsOneWidget);
+    expect(find.text('JPEG'), findsOneWidget);
+
+    // JPEG previews switch the primary action label.
+    await tester.tap(find.text('JPEG'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Create JPEG'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Close export'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    // Let the debounced autosave fire so no timer outlives the test.
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+  });
+
+  testWidgets('details typing and the invite-actions sheet hold on a phone', (
+    tester,
+  ) async {
+    setSize(tester, const Size(320, 568));
+    final studio = await mountEditor(tester);
+
+    // Type a long first name through the real details sheet.
+    await tester.tap(find.text('Details').last);
+    await tester.pumpAndSettle();
+    final first = find.descendant(
+      of: find.byKey(const ValueKey('field_first')),
+      matching: find.byType(TextField),
+    );
+    await tester.ensureVisible(first);
+    await tester.enterText(first, 'Muhammed Abdulrahman Umar');
+    await tester.pumpAndSettle();
+    expect(studio.fieldValue('first'), 'Muhammed Abdulrahman Umar');
+    expect(tester.takeException(), isNull);
+
+    // The calendar/RSVP actions sheet lays out beside the keyboard-safe area.
+    final actionsButton = find.text('Calendar file, link & RSVP code');
+    for (var i = 0; i < 8 && tester.widgetList(actionsButton).isEmpty; i++) {
+      await tester.drag(find.byType(ListView).first, const Offset(0, -200));
+      await tester.pumpAndSettle();
+    }
+    while (tester.getRect(actionsButton).bottom > 568) {
+      await tester.drag(find.byType(ListView).first, const Offset(0, -120));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(actionsButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Invitation actions'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.enterText(
+      find.byKey(const ValueKey('rsvp_url')),
+      'https://rsvp.example.com/our-day',
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    // Close the sheet by tapping the scrim above it.
+    await tester.tapAt(const Offset(10, 20));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Close panel'));
+    await tester.pumpAndSettle();
+
+    // Let the debounced autosave fire so no timer outlives the test.
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+  });
+
   testWidgets('home wizard completes on the narrowest phone', (tester) async {
     setSize(tester, const Size(320, 568));
     final studio = StudioController(

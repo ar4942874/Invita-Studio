@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'jpeg_encoder.dart';
 
 import '../application/studio_controller.dart';
+import '../domain/invitation_template.dart';
 
 enum ImageFormat { png, jpeg }
 
@@ -34,7 +35,13 @@ class ExportService {
     await studio.flush();
     final doc = studio.document;
     final title = studio.project.title;
-    final png = await studio.editor.exportToPng(pixelRatio: scale.toDouble());
+    // Re-fit text frames so the downloaded image can never paint a name or
+    // line beyond its box, even when the stored geometry has drifted from
+    // the on-device text metrics.
+    final png = await studio.editor.exportToPng(
+      pixelRatio: scale.toDouble(),
+      document: fitTextDocument(doc),
+    );
     final bytes = format == ImageFormat.png ? png : await encodeJpeg(png);
     final slug = title
         .toLowerCase()

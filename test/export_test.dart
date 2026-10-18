@@ -1,5 +1,6 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -229,6 +230,71 @@ void main() {
       }
       expect(xs, isNotEmpty);
       expect(xs.reduce((a, b) => a + b) / xs.length, inInclusiveRange(45, 55));
+    },
+  );
+  test(
+    'the export re-fits stored text so a drifted draft cannot overlap names',
+    () async {
+      final studio = StudioController(
+        project: StudioProject.sample(),
+        store: MemoryProjectStore(),
+      );
+      addTearDown(studio.dispose);
+      // Simulate the phone draft: long names held at the original template
+      // size, without the fit the editor would apply on a fresh edit.
+      final bloated = studio.document.nodes
+          .map(
+            (n) => n is TextNode && (n.id == 'first' || n.id == 'second')
+                ? n.copyWith(
+                    text: n.id == 'first'
+                        ? 'Muhammed Abdulrahman Umar'
+                        : 'Ayesha Fatimah Siddiqua',
+                    fontSize: 148,
+                  )
+                : n,
+          )
+          .toList();
+      await studio.editor.applyDocument(
+        studio.document.copyWith(nodes: bloated),
+      );
+      await studio.flush();
+      final drifted = await ExportService.render(
+        studio,
+        format: ImageFormat.png,
+        scale: 2,
+      );
+
+      // Direct guarantee: after fitTextDocument every text node measures
+      // inside its own frame.
+      for (final node in fitTextDocument(studio.document).nodes
+          .whereType<TextNode>()) {
+        final painter = TextPainter(
+          text: TextSpan(text: node.text, style: nodeTextStyle(node)),
+          textDirection: invitationTextDirection(node.text),
+        )..layout(maxWidth: math.max(2, node.frame.width));
+        expect(
+          painter.height,
+          lessThanOrEqualTo(node.frame.height + .01),
+          reason: '${node.id} would draw past its frame in the image.',
+        );
+        painter.dispose();
+      }
+
+      // The exporter's self-fit matches the editor's own fitted layout:
+      // rendering the same long names through setField is pixel-identical.
+      await studio.setField('first', 'Muhammed Abdulrahman Umar');
+      await studio.setField('second', 'Ayesha Fatimah Siddiqua');
+      await studio.flush();
+      final fitted = await ExportService.render(
+        studio,
+        format: ImageFormat.png,
+        scale: 2,
+      );
+      expect(
+        listEquals(drifted.bytes, fitted.bytes),
+        isTrue,
+        reason: 'A drifted draft must export exactly like the fitted one.',
+      );
     },
   );
 }

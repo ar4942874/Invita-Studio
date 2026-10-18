@@ -593,8 +593,7 @@ TextStyle nodeTextStyle(TextNode node, {double? size}) => TextStyle(
 );
 
 /// Keep the entire value, shrinking only when needed. No truncation/ellipsis.
-TextNode fitTextNode(TextNode node, {double? maxHeight}) {
-  final allowed = maxHeight ?? node.frame.height;
+TextNode fitTextNode(TextNode node, {double? maxHeight}) {  final allowed = maxHeight ?? node.frame.height;
   final painter = TextPainter(
     textDirection: invitationTextDirection(node.text),
   );
@@ -623,6 +622,21 @@ TextNode fitTextNode(TextNode node, {double? maxHeight}) {
   painter.dispose();
   return node.copyWith(fontSize: size);
 }
+
+/// Re-fits every text node of [doc] to its own frame.
+///
+/// Used before rendering an export (PNG, JPEG or video frame): if a stored
+/// frame carries text the live metrics say no longer fits — a device font
+/// rounding, a resized frame, an older draft — the downloaded image would
+/// draw the overflow over neighbouring layers even though the on-screen
+/// preview hid it. Shrinking to [fitTextNode] guarantees the saved output
+/// only ever adds whitespace, never overlap.
+DesignDocument fitTextDocument(DesignDocument doc) => doc.copyWith(
+  nodes: [
+    for (final node in doc.nodes)
+      if (node is TextNode) fitTextNode(node) else node,
+  ],
+);
 
 Map<String, String> fieldsFor(DesignDocument doc) => {
   for (final n in doc.nodes.whereType<TextNode>())

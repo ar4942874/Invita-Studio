@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
+import '../../domain/invitation_template.dart';
 import '../../domain/video/timeline.dart';
 import 'video_media.dart';
 
@@ -120,9 +121,9 @@ int clipFrameIndexFor({
 /// come from the shared canvas engine.
 class TimelineFrameRenderer {
   TimelineFrameRenderer({
-    required this.document,
+    required DesignDocument document,
     required this.imageCache,
-  });
+  }) : document = fitTextDocument(document);
 
   final DesignDocument document;
   final Map<String, ui.Image> imageCache;

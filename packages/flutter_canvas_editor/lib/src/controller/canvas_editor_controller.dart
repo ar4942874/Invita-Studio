@@ -338,12 +338,18 @@ class CanvasEditorController {
     return DesignDocument.fromJson(json, customNodes: customNodeRegistry);
   }
 
-  /// Renders the current Design Document to PNG bytes (same pipeline as the live canvas).
-  Future<Uint8List> exportToPng({double pixelRatio = 2.0}) async {
+  /// Renders the current Design Document to PNG bytes (same pipeline as the
+  /// live canvas). [document] may pass an alternative snapshot — the host uses
+  /// it to re-fit text frames so the saved file cannot draw overflow.
+  Future<Uint8List> exportToPng({
+    double pixelRatio = 2.0,
+    DesignDocument? document,
+  }) async {
     // Capture BEFORE the first await: typing during image loading must not
     // change the export or mix two document versions.
-    final snapshot = document.copyWith(
-      nodes: List.unmodifiable(document.nodes),
+    final source = document ?? this.document;
+    final snapshot = source.copyWith(
+      nodes: List.unmodifiable(source.nodes),
     );
     if (!pixelRatio.isFinite ||
         pixelRatio <= 0 ||
