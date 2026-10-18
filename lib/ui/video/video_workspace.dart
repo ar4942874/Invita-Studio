@@ -219,6 +219,7 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
           media: _media,
           onSettings: widget.onOpenSettings,
           onExport: widget.onExport,
+          compact: widget.compact,
         ),
         _AnimationGallery(
           selected: _selectedPreset,
@@ -254,6 +255,7 @@ class _Transport extends StatelessWidget {
     required this.media,
     required this.onSettings,
     required this.onExport,
+    required this.compact,
   });
 
   final VideoPlaybackController playback;
@@ -261,6 +263,7 @@ class _Transport extends StatelessWidget {
   final VideoMediaBundle media;
   final VoidCallback onSettings;
   final VoidCallback onExport;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +276,7 @@ class _Transport extends StatelessWidget {
         ? 'Music missing'
         : 'Music on';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 14, vertical: 8),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: StudioColors.border)),
@@ -291,32 +294,46 @@ class _Transport extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: compact ? 6 : 10),
           AnimatedBuilder(
             animation: playback,
             builder: (context, _) => Text(
               '${playback.timecode} / ${playback.durationTimecode}',
-              style: const TextStyle(
-                fontSize: 11.5,
+              style: TextStyle(
+                fontSize: compact ? 10.5 : 11.5,
                 fontFeatures: [FontFeature.tabularFigures()],
                 color: StudioColors.ink,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              audioLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10.5,
-                color: media.audioMissing ? StudioColors.warning : StudioColors.muted,
+          SizedBox(width: compact ? 8 : 12),
+          if (compact)
+            Expanded(
+              child: Text(
+                audioLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: media.audioMissing ? StudioColors.warning : StudioColors.muted,
+                ),
+              ),
+            )
+          else ...[
+            Flexible(
+              child: Text(
+                audioLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: media.audioMissing ? StudioColors.warning : StudioColors.muted,
+                ),
               ),
             ),
-          ),
-          const Spacer(),
-          if (!timeline.enabled)
+            const Spacer(),
+          ],
+          if (!timeline.enabled && !compact)
             const Padding(
               padding: EdgeInsets.only(right: 8),
               child: Text(
@@ -329,11 +346,14 @@ class _Transport extends StatelessWidget {
             onPressed: onSettings,
             icon: const Icon(Icons.tune, size: 19),
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: compact ? 2 : 4),
           FilledButton.icon(
             onPressed: onExport,
+            style: FilledButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 20),
+            ),
             icon: const Icon(Icons.movie_creation_outlined, size: 16),
-            label: const Text('Export MP4'),
+            label: Text(compact ? 'MP4' : 'Export MP4'),
           ),
         ],
       ),

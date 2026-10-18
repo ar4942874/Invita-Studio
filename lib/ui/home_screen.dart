@@ -6,9 +6,9 @@ import '../domain/invitation_template.dart';
 import '../domain/project.dart';
 import '../domain/relative_time.dart';
 import '../l10n/app_localizations.dart';
+import 'home_theme.dart';
 import 'project_actions.dart';
 import 'studio_screen.dart';
-import 'studio_theme.dart';
 import 'widgets/controls.dart';
 import 'widgets/document_preview.dart';
 
@@ -34,6 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<String, String> _values = {};
 
   StudioController get _studio => widget.studio;
+
+  /// The home shell runs on the OpenDesign `elegant` package; see
+  /// `home_theme.dart`. Memoized because `ThemeData` is rebuilt every frame.
+  late final _elegant = elegantHomeTheme();
 
   AppLocalizations get _l10n => AppLocalizations.of(context);
 
@@ -72,9 +76,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openStudio() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => StudioScreen(studio: _studio)));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => StudioScreen(studio: _studio)),
+    );
   }
 
   Future<void> _continueEditing() => _openStudio();
@@ -110,33 +114,38 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: StudioColors.canvas,
-    body: DecoratedBox(
-      decoration: const BoxDecoration(gradient: studioPageGradient),
-      child: SafeArea(
-        child: Column(
-          children: [
-            _topBar(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 26, 20, 40),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1040),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      child: switch (_step) {
-                        0 => _categoryStep(),
-                        1 => _detailsStep(),
-                        _ => _cardStep(),
-                      },
+  Widget build(BuildContext context) => Theme(
+    data: _elegant,
+    child: Builder(
+      builder: (context) => Scaffold(
+        backgroundColor: HomeColors.canvas,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(gradient: homePageGradient),
+          child: SafeArea(
+            child: Column(
+              children: [
+                _topBar(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 26, 20, 40),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1040),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: switch (_step) {
+                            0 => _categoryStep(),
+                            1 => _detailsStep(),
+                            _ => _cardStep(),
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     ),
@@ -145,8 +154,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _topBar() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
     decoration: const BoxDecoration(
-      color: StudioColors.surface,
-      border: Border(bottom: BorderSide(color: StudioColors.border)),
+      color: HomeColors.surface,
+      border: Border(bottom: BorderSide(color: HomeColors.border)),
     ),
     child: Row(
       children: [
@@ -169,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const Spacer(),
-        TinyLabel(_stepTitle),
+        TinyLabel(_stepTitle, color: HomeColors.meta),
       ],
     ),
   );
@@ -196,10 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
     key: const ValueKey('step_category'),
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _heading(
-        _l10n.homeCelebrateTitle,
-        _l10n.homeCelebrateSubtitle,
-      ),
+      _heading(_l10n.homeCelebrateTitle, _l10n.homeCelebrateSubtitle),
       _continueCard(),
       const SizedBox(height: 26),
       LayoutBuilder(
@@ -210,8 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ? 2
               : 3;
           const gap = 14.0;
-          final width =
-              (constraints.maxWidth - gap * (columns - 1)) / columns;
+          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
           return Wrap(
             spacing: gap,
             runSpacing: gap,
@@ -239,9 +244,9 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: StudioColors.accentSoft.withValues(alpha: .5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: StudioColors.border),
+        color: HomeColors.accentSoft.withValues(alpha: .5),
+        borderRadius: HomeShape.mdRadius,
+        border: Border.all(color: HomeColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const Icon(
                 Icons.edit_note_outlined,
                 size: 18,
-                color: StudioColors.accent,
+                color: HomeColors.accent,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -349,22 +354,20 @@ class _HomeScreenState extends State<HomeScreen> {
         _l10n.chooseACard,
         _category == null
             ? _l10n.homeCardSubtitle
-            : _l10n.homeCardSubtitleForCategory(
-                _category!.label.toLowerCase(),
-              ),
+            : _l10n.homeCardSubtitleForCategory(_category!.label.toLowerCase()),
       ),
       LayoutBuilder(
         builder: (context, constraints) {
           final columns = constraints.maxWidth < 640 ? 1 : 3;
           const gap = 16.0;
-          final width =
-              (constraints.maxWidth - gap * (columns - 1)) / columns;
+          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
           return Wrap(
             spacing: gap,
             runSpacing: gap,
             children: [
-              for (final template
-                  in templatesFor(_category ?? InvitationCategory.wedding))
+              for (final template in templatesFor(
+                _category ?? InvitationCategory.wedding,
+              ))
                 SizedBox(
                   width: width,
                   child: _CardTile(
@@ -379,10 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       const SizedBox(height: 30),
-      _footer(
-        primaryLabel: _l10n.createInvitation,
-        onPrimary: _create,
-      ),
+      _footer(primaryLabel: _l10n.createInvitation, onPrimary: _create),
     ],
   );
 
@@ -409,16 +409,16 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: StudioColors.wash,
-    borderRadius: BorderRadius.circular(12),
+    color: HomeColors.surface,
+    borderRadius: HomeShape.mdRadius,
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: HomeShape.mdRadius,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border.all(color: StudioColors.border),
-          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: HomeColors.border),
+          borderRadius: HomeShape.mdRadius,
         ),
         child: Row(
           children: [
@@ -427,10 +427,10 @@ class _CategoryTile extends StatelessWidget {
               height: 42,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: StudioColors.accentSoft,
-                borderRadius: BorderRadius.circular(11),
+                color: HomeColors.accentSoft,
+                borderRadius: HomeShape.smRadius,
               ),
-              child: Icon(category.icon, size: 21, color: StudioColors.accent),
+              child: Icon(category.icon, size: 21, color: HomeColors.accent),
             ),
             const SizedBox(width: 13),
             Expanded(
@@ -449,7 +449,7 @@ class _CategoryTile extends StatelessWidget {
                     category.tagline,
                     style: const TextStyle(
                       fontSize: 10.5,
-                      color: StudioColors.muted,
+                      color: HomeColors.muted,
                     ),
                   ),
                 ],
@@ -458,7 +458,7 @@ class _CategoryTile extends StatelessWidget {
             const Icon(
               Icons.arrow_forward_ios,
               size: 13,
-              color: StudioColors.muted,
+              color: HomeColors.muted,
             ),
           ],
         ),
@@ -496,26 +496,26 @@ class _CardTile extends StatelessWidget {
       excludeSemantics: true,
       child: Material(
         color: selected
-            ? StudioColors.accentSoft.withValues(alpha: .55)
-            : StudioColors.wash,
-        borderRadius: BorderRadius.circular(12),
+            ? HomeColors.accentSoft.withValues(alpha: .55)
+            : HomeColors.surface,
+        borderRadius: HomeShape.mdRadius,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: HomeShape.mdRadius,
           child: Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
               border: Border.all(
-                color: selected ? StudioColors.accent : StudioColors.border,
+                color: selected ? HomeColors.accent : HomeColors.border,
                 width: selected ? 1.4 : 1,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: HomeShape.mdRadius,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
                   child: AspectRatio(
                     aspectRatio: 1080 / 1512,
                     child: DocumentPreview(document: document),
@@ -537,17 +537,14 @@ class _CardTile extends StatelessWidget {
                       const Icon(
                         Icons.check_circle,
                         size: 17,
-                        color: StudioColors.accent,
+                        color: HomeColors.accent,
                       ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   template.caption,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: StudioColors.muted,
-                  ),
+                  style: const TextStyle(fontSize: 10, color: HomeColors.muted),
                 ),
               ],
             ),
@@ -582,8 +579,7 @@ class _DraftRow extends StatelessWidget {
     final locale = Localizations.localeOf(context).languageCode;
     final relative = relativeTimeLabel(draft.updatedAt);
     final stamp =
-        relative ??
-        DateFormat.yMMMd(locale).format(draft.updatedAt.toLocal());
+        relative ?? DateFormat.yMMMd(locale).format(draft.updatedAt.toLocal());
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -613,7 +609,7 @@ class _DraftRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 9.5,
-                        color: StudioColors.muted,
+                        color: HomeColors.muted,
                       ),
                     ),
                   ],
@@ -622,7 +618,7 @@ class _DraftRow extends StatelessWidget {
               if (active)
                 const Padding(
                   padding: EdgeInsets.only(right: 4),
-                  child: TinyLabel('Editing'),
+                  child: TinyLabel('Editing', color: HomeColors.meta),
                 ),
               PopupMenuButton<String>(
                 tooltip: 'Draft options',

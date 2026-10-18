@@ -48,7 +48,7 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 | Dependency resolution with `pubspec.lock` | Passed |
 | `flutter analyze` | **No issues found** |
 | `flutter test --concurrency=1 test packages/flutter_canvas_editor/test` | **64 passed** (image-editor baseline) |
-| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 19 test files pass** |
+| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 20 test files pass** |
 | `flutter build web --release --no-web-resources-cdn --no-wasm-dry-run -O1` | **Built successfully** |
 | Real compiled-app browser workflow checks | **12 passed** |
 | Real compiled-app photo-card browser checks | **7 passed** |
@@ -89,20 +89,27 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 
 `tool/browser/smoke.cjs` runs against the actual compiled Flutter application over HTTP. It starts with isolated browser contexts and blocks requests outside the app origin.
 
-1. Boots using locally served renderer, fonts and artwork.
-2. Changes names/venue through real form input and observes the serialized local draft.
-3. Switches to After dark and Story while retaining text.
-4. Creates/downloads a genuine **2160 × 3840 JPEG**.
-5. Exercises unsupported browser sharing and checks that the UI directs the user to download instead of claiming success.
-6. Downloads editable JSON and checks actual document content.
-7. Reloads and restores the saved invitation.
-8. Imports the JSON into a fresh browser session.
-9. Selects an imported text layer for styling.
-10. Edits through a **390 px** mobile Details sheet.
-11. Switches to Rosewater/Square and downloads a genuine **2160 × 2160 PNG** from a **320 px** viewport.
-12. Asserts no uncaught errors or external network dependencies in those workflows.
+Desktop (**1440 px**), all driven through the real semantics tree:
+
+1. Boots on the guided start using locally served renderer, fonts and artwork.
+2. Completes the wizard — category, names/venue, a catalogue design — and lands in the studio with those details.
+3. Creates/downloads a genuine 2× Classic **PNG (2160 × 3024)** and checks the signature.
+4. Catalogue: "All designs" reaches sixty, "For you" returns to ten, starring moves a design into Favourites, and "Surprise me" applies a *different* design (verified through the serialized draft, since autosave is debounced).
+5. Switches to **Story** and confirms the reflow keeps the names.
+6. **Event settings** changes the celebration to Birthday; the saved category follows.
+7. **Invitation actions**: picking a date unlocks `Save .ics` / Google Calendar and the RSVP code section.
+8. **Duplicate draft** adds a second draft and reports it.
+9. Downloads editable JSON and checks the document content, category and format.
+10. Reloads and restores the draft, its celebration and the relative edit time.
+11. Imports the JSON into a fresh browser session and selects an imported layer.
+
+Mobile: a **390 px** wizard + Details sheet edits the real document, and a **320 px** viewport downloads a genuine 2× Square **PNG (2160 × 2160)**.
+
+Final assertions: zero uncaught page errors, zero console errors, zero external network requests in those workflows. Run log with timestamps and per-check status is written to `artifacts/browser/smoke-report.json`; screenshots of home, studio, favourites, event settings and the invitation actions sit beside it.
 
 A separate actual browser download of the default Classic template was also decoded as **PNG, 2160 × 3024**. The independent checks are recorded in `docs/qa/download-validation.json`; the corresponding examples are in `examples/exports/`.
+
+Note: `tool/browser/smoke.cjs` drives the *current* guided start, catalogue grid, event sheet and actions. Flutter merges sibling text into a parent node's `aria-label`, so the script asserts through a small helper that reads both `aria-label` and text content; design tiles expose one concise accessible name and exclude the card preview from semantics.
 
 ## Photo-card browser workflow
 
