@@ -16,6 +16,9 @@ import 'widgets/document_preview.dart';
 ///
 /// It never edits the canvas directly; once the user confirms a card it creates
 /// a fresh [StudioProject] through [StudioController] and opens the editor.
+///
+/// Composition follows the OpenDesign `elegant` package: serif display
+/// headlines at hero scale, generous section rhythm, quiet ringed cards.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.studio});
   final StudioController studio;
@@ -127,10 +130,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 _topBar(),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 26, 20, 40),
+                    padding: const EdgeInsets.fromLTRB(0, 0, 0, 56),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1040),
+                        // --container-max from the Elegant contract.
+                        constraints: const BoxConstraints(maxWidth: 1180),
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 220),
                           child: switch (_step) {
@@ -152,10 +156,10 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   Widget _topBar() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
     decoration: const BoxDecoration(
       color: HomeColors.surface,
-      border: Border(bottom: BorderSide(color: HomeColors.border)),
+      border: Border(bottom: BorderSide(color: HomeColors.borderSoft)),
     ),
     child: Row(
       children: [
@@ -165,39 +169,93 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _back,
             icon: const Icon(Icons.arrow_back, size: 20),
           ),
-        const BrandMark(size: 33),
-        const SizedBox(width: 10),
+        const BrandMark(size: 36),
+        const SizedBox(width: 11),
         Text(
           _l10n.brandName,
           style: const TextStyle(
             fontFamily: 'CormorantGaramond',
-            fontSize: 30,
+            fontSize: 32,
             height: 1,
             fontWeight: FontWeight.w600,
-            letterSpacing: -.8,
+            letterSpacing: -1.2,
           ),
         ),
         const Spacer(),
-        TinyLabel(_stepTitle, color: HomeColors.meta),
+        // The indicator needs ~200px; on the narrowest phones the step title
+        // in the editor shell and the heading carry the orientation instead.
+        if (MediaQuery.sizeOf(context).width >= 420) _stepsIndicator(),
       ],
     ),
   );
 
-  Widget _heading(String title, String subtitle) => Column(
+  /// 1 Category → 2 Details → 3 Card, as small numbered pips; the active one
+  /// reads in cacao and the label beside it names the current step.
+  Widget _stepsIndicator() => Row(
+    key: const ValueKey('home_steps'),
+    children: [
+      Text(_stepTitle, style: const TextStyle(fontSize: 12.5)),
+      const SizedBox(width: 12),
+      for (var i = 0; i < 3; i++) ...[
+        Container(
+          width: i == _step ? 26 : 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: i == _step
+                ? HomeColors.accent
+                : i < _step
+                ? HomeColors.surfaceWarm
+                : HomeColors.borderSoft,
+            borderRadius: const BorderRadius.all(Radius.circular(4)),
+          ),
+        ),
+        if (i < 2) const SizedBox(width: 6),
+      ],
+    ],
+  );
+
+  /// Serif hero headline at the Elegant display scale — 2xl (42px) on wide
+  /// screens, stepping down for phones. Keep `height`/`letterspacing` from
+  /// `--leading-tight` and `--tracking-display`.
+  double get _heroSize {
+    final width = MediaQuery.sizeOf(context).width;
+    return width >= 720 ? 42 : width >= 400 ? 34 : 30;
+  }
+
+  TextStyle get _displayStyle => TextStyle(
+    fontFamily: 'CormorantGaramond',
+    fontSize: _heroSize,
+    height: 1.02,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -_heroSize * .025,
+    color: HomeColors.ink,
+  );
+
+  Widget _eyebrow(String text) => Text(
+    text.toUpperCase(),
+    style: const TextStyle(
+      fontSize: 10.5,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 1.8,
+      color: HomeColors.meta,
+    ),
+  );
+
+  Widget _heading(String title, String subtitle, {String? eyebrow}) => Column(
     key: ValueKey('heading_$title'),
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(
-        title,
-        style: const TextStyle(
-          fontSize: 26,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -.6,
+      if (eyebrow != null) ...[_eyebrow(eyebrow), const SizedBox(height: 10)],
+      Text(title, style: _displayStyle),
+      const SizedBox(height: 10),
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Text(
+          subtitle,
+          style: const TextStyle(fontSize: 15, height: 1.55),
         ),
       ),
-      const SizedBox(height: 8),
-      Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-      const SizedBox(height: 24),
+      const SizedBox(height: 32),
     ],
   );
 
@@ -205,33 +263,44 @@ class _HomeScreenState extends State<HomeScreen> {
     key: const ValueKey('step_category'),
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _heading(_l10n.homeCelebrateTitle, _l10n.homeCelebrateSubtitle),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: _heading(
+          _l10n.homeCelebrateTitle,
+          _l10n.homeCelebrateSubtitle,
+          eyebrow: _l10n.brandName,
+        ),
+      ),
       _continueCard(),
       const SizedBox(height: 26),
-      LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = constraints.maxWidth < 520
-              ? 1
-              : constraints.maxWidth < 820
-              ? 2
-              : 3;
-          const gap = 14.0;
-          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-          return Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: [
-              for (final category in InvitationCategory.values)
-                SizedBox(
-                  width: width,
-                  child: _CategoryTile(
-                    category: category,
-                    onTap: () => _chooseCategory(category),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth < 520
+                ? 1
+                : constraints.maxWidth < 820
+                ? 2
+                : 3;
+            const gap = 18.0;
+            final width = (constraints.maxWidth - gap * (columns - 1)) /
+                columns;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final category in InvitationCategory.values)
+                  SizedBox(
+                    width: width,
+                    child: _CategoryTile(
+                      category: category,
+                      onTap: () => _chooseCategory(category),
+                    ),
                   ),
-                ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     ],
   );
@@ -240,57 +309,71 @@ class _HomeScreenState extends State<HomeScreen> {
     final drafts = _studio.drafts;
     if (drafts.isEmpty) return const SizedBox.shrink();
     final latest = drafts.first;
-    return Container(
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: HomeColors.accentSoft.withValues(alpha: .5),
-        borderRadius: HomeShape.mdRadius,
-        border: Border.all(color: HomeColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.edit_note_outlined,
-                size: 18,
-                color: HomeColors.accent,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _l10n.continueDraft(latest.title),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+      child: Container(
+        margin: const EdgeInsets.only(top: 2),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: HomeColors.surface,
+          borderRadius: HomeShape.lgRadius,
+          border: Border.all(color: HomeColors.borderSoft),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: HomeColors.accentSoft,
+                    borderRadius: HomeShape.smRadius,
+                  ),
+                  child: const Icon(
+                    Icons.edit_note_outlined,
+                    size: 21,
+                    color: HomeColors.accent,
                   ),
                 ),
-              ),
-              FilledButton(
-                onPressed: _continueEditing,
-                child: Text(_l10n.continueEditing),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TinyLabel(_l10n.recentInvitations),
-          const SizedBox(height: 4),
-          for (final draft in drafts.take(4))
-            _DraftRow(
-              draft: draft,
-              active: draft.id == _studio.project.id,
-              onOpen: () => _openDraft(draft),
-              onDuplicate: () => duplicateDraft(context, _studio, draft),
-              onSaveCopy: () => saveProjectCopy(context, draft),
-              onDelete: draft.id == _studio.project.id
-                  ? null
-                  : () => _deleteDraft(draft),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _l10n.continueDraft(latest.title),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                FilledButton(
+                  onPressed: _continueEditing,
+                  child: Text(_l10n.continueEditing),
+                ),
+              ],
             ),
-        ],
+            const SizedBox(height: 14),
+            const Divider(height: 1, color: HomeColors.borderSoft),
+            const SizedBox(height: 8),
+            TinyLabel(_l10n.recentInvitations, color: HomeColors.meta),
+            const SizedBox(height: 4),
+            for (final draft in drafts.take(4))
+              _DraftRow(
+                draft: draft,
+                active: draft.id == _studio.project.id,
+                onOpen: () => _openDraft(draft),
+                onDuplicate: () => duplicateDraft(context, _studio, draft),
+                onSaveCopy: () => saveProjectCopy(context, draft),
+                onDelete: draft.id == _studio.project.id
+                    ? null
+                    : () => _deleteDraft(draft),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -304,38 +387,46 @@ class _HomeScreenState extends State<HomeScreen> {
     key: const ValueKey('step_details'),
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _heading(
-        _category?.label ?? _l10n.stepYourDetails,
-        _l10n.homeDetailsSubtitle,
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+        child: _heading(
+          _category?.label ?? _l10n.stepYourDetails,
+          _l10n.homeDetailsSubtitle,
+          eyebrow: _l10n.stepYourDetails,
+        ),
       ),
-      LayoutBuilder(
-        builder: (context, constraints) {
-          final twoUp = constraints.maxWidth >= 640;
-          const gap = 18.0;
-          final width = twoUp
-              ? (constraints.maxWidth - gap) / 2
-              : constraints.maxWidth;
-          return Wrap(
-            spacing: gap,
-            runSpacing: 18,
-            children: [
-              for (final field in invitationFields)
-                SizedBox(
-                  width: width,
-                  child: BoundInput(
-                    key: ValueKey('home_field_${field.id}'),
-                    value: _values[field.id] ?? field.initial,
-                    label: field.label,
-                    maxLines: field.lines,
-                    maxLength: field.maxLength,
-                    onChanged: (value) => _values[field.id] = value,
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final twoUp = constraints.maxWidth >= 640;
+            const gap = 24.0;
+            final width = twoUp
+                ? (constraints.maxWidth - gap) / 2
+                : constraints.maxWidth;
+            return Wrap(
+              spacing: gap,
+              runSpacing: 20,
+              children: [
+                for (final field in invitationFields)
+                  SizedBox(
+                    width: width,
+                    child: BoundInput(
+                      key: ValueKey('home_field_${field.id}'),
+                      value: _values[field.id] ?? field.initial,
+                      label: field.label,
+                      maxLines: field.lines,
+                      maxLength: field.maxLength,
+                      compact: false,
+                      onChanged: (value) => _values[field.id] = value,
+                    ),
                   ),
-                ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
-      const SizedBox(height: 30),
+      const SizedBox(height: 28),
       _footer(
         primaryLabel: _l10n.chooseACard,
         onPrimary: () {
@@ -350,38 +441,46 @@ class _HomeScreenState extends State<HomeScreen> {
     key: const ValueKey('step_card'),
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _heading(
-        _l10n.chooseACard,
-        _category == null
-            ? _l10n.homeCardSubtitle
-            : _l10n.homeCardSubtitleForCategory(_category!.label.toLowerCase()),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+        child: _heading(
+          _l10n.chooseACard,
+          _category == null
+              ? _l10n.homeCardSubtitle
+              : _l10n.homeCardSubtitleForCategory(_category!.label.toLowerCase()),
+          eyebrow: _l10n.stepPickCard,
+        ),
       ),
-      LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = constraints.maxWidth < 640 ? 1 : 3;
-          const gap = 16.0;
-          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-          return Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: [
-              for (final template in templatesFor(
-                _category ?? InvitationCategory.wedding,
-              ))
-                SizedBox(
-                  width: width,
-                  child: _CardTile(
-                    template: template,
-                    fields: _values,
-                    selected: _template.id == template.id,
-                    onTap: () => setState(() => _template = template),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth < 640 ? 1 : 3;
+            const gap = 20.0;
+            final width = (constraints.maxWidth - gap * (columns - 1)) /
+                columns;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final template in templatesFor(
+                  _category ?? InvitationCategory.wedding,
+                ))
+                  SizedBox(
+                    width: width,
+                    child: _CardTile(
+                      template: template,
+                      fields: _values,
+                      selected: _template.id == template.id,
+                      onTap: () => setState(() => _template = template),
+                    ),
                   ),
-                ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
-      const SizedBox(height: 30),
+      const SizedBox(height: 28),
       _footer(primaryLabel: _l10n.createInvitation, onPrimary: _create),
     ],
   );
@@ -389,82 +488,154 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _footer({
     required String primaryLabel,
     required VoidCallback onPrimary,
-  }) => Row(
-    children: [
-      OutlinedButton(onPressed: _back, child: Text(_l10n.back)),
-      const Spacer(),
-      FilledButton.icon(
-        onPressed: onPrimary,
-        icon: const Icon(Icons.arrow_forward, size: 17),
-        label: Text(primaryLabel),
-      ),
-    ],
+  }) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+    child: Column(
+      children: [
+        const Divider(height: 1, color: HomeColors.borderSoft),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            OutlinedButton(
+              onPressed: _back,
+              child: Text(_l10n.back, style: const TextStyle(fontSize: 14)),
+            ),
+            const Spacer(),
+            FilledButton.icon(
+              onPressed: onPrimary,
+              icon: const Icon(Icons.arrow_forward, size: 17),
+              label: Text(primaryLabel, style: const TextStyle(fontSize: 14)),
+            ),
+          ],
+        ),
+      ],
+    ),
   );
 }
 
-class _CategoryTile extends StatelessWidget {
+/// One category choice: a warm medallion, the label and a tagline, inside a
+/// quiet ringed card that lifts slightly on hover — Elegant's `elev-raised`
+/// softened for a landing grid.
+class _CategoryTile extends StatefulWidget {
   const _CategoryTile({required this.category, required this.onTap});
   final InvitationCategory category;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: HomeColors.surface,
-    borderRadius: HomeShape.mdRadius,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: HomeShape.mdRadius,
-      child: Container(
-        padding: const EdgeInsets.all(16),
+  State<_CategoryTile> createState() => _CategoryTileState();
+}
+
+class _CategoryTileState extends State<_CategoryTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final category = widget.category;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
-          border: Border.all(color: HomeColors.border),
-          borderRadius: HomeShape.mdRadius,
+          color: HomeColors.surface,
+          borderRadius: HomeShape.lgRadius,
+          border: Border.all(
+            color: _hovered ? HomeColors.border : HomeColors.borderSoft,
+          ),
+          boxShadow: _hovered
+              ? [
+                  BoxShadow(
+                    color: HomeColors.ink.withValues(alpha: .07),
+                    blurRadius: 28,
+                    offset: const Offset(0, 10),
+                  ),
+                ]
+              : const [],
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: HomeColors.accentSoft,
-                borderRadius: HomeShape.smRadius,
-              ),
-              child: Icon(category.icon, size: 21, color: HomeColors.accent),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: HomeShape.lgRadius,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: HomeShape.lgRadius,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
                 children: [
-                  Text(
-                    category.label,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                  Container(
+                    width: 56,
+                    height: 56,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [HomeColors.surfaceWarm, HomeColors.accentSoft],
+                      ),
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(14),
+                      ),
+                    ),
+                    child: Icon(
+                      category.icon,
+                      size: 25,
+                      color: HomeColors.accent,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    category.tagline,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: HomeColors.muted,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          category.label,
+                          style: const TextStyle(
+                            fontFamily: 'CormorantGaramond',
+                            fontSize: 21,
+                            height: 1.1,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -.2,
+                            color: HomeColors.ink,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          category.tagline,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            height: 1.45,
+                            color: HomeColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: HomeColors.wash,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward,
+                      size: 14,
+                      color: HomeColors.accent,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 13,
-              color: HomeColors.muted,
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _CardTile extends StatelessWidget {
@@ -494,59 +665,68 @@ class _CardTile extends StatelessWidget {
       button: true,
       selected: selected,
       excludeSemantics: true,
-      child: Material(
-        color: selected
-            ? HomeColors.accentSoft.withValues(alpha: .55)
-            : HomeColors.surface,
-        borderRadius: HomeShape.mdRadius,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: HomeShape.mdRadius,
-          child: Container(
-            padding: const EdgeInsets.all(13),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: selected ? HomeColors.accent : HomeColors.border,
-                width: selected ? 1.4 : 1,
-              ),
-              borderRadius: HomeShape.mdRadius,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
-                  child: AspectRatio(
-                    aspectRatio: 1080 / 1512,
-                    child: DocumentPreview(document: document),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: selected
+              ? HomeColors.accentSoft.withValues(alpha: .45)
+              : HomeColors.surface,
+          borderRadius: HomeShape.lgRadius,
+          border: Border.all(
+            color: selected ? HomeColors.accent : HomeColors.borderSoft,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: HomeShape.lgRadius,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: HomeShape.lgRadius,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.all(Radius.circular(10)),
+                    child: AspectRatio(
+                      aspectRatio: 1080 / 1512,
+                      child: DocumentPreview(document: document),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        template.name,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          template.name,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
+                      if (selected)
+                        const Icon(
+                          Icons.check_circle,
+                          size: 18,
+                          color: HomeColors.accent,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    template.caption,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      height: 1.45,
+                      color: HomeColors.muted,
                     ),
-                    if (selected)
-                      const Icon(
-                        Icons.check_circle,
-                        size: 17,
-                        color: HomeColors.accent,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  template.caption,
-                  style: const TextStyle(fontSize: 10, color: HomeColors.muted),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -586,7 +766,7 @@ class _DraftRow extends StatelessWidget {
         onTap: onOpen,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
           child: Row(
             children: [
               Expanded(
@@ -598,17 +778,17 @@ class _DraftRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       '${draft.category.label} · edited $stamp',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 9.5,
+                        fontSize: 10.5,
                         color: HomeColors.muted,
                       ),
                     ),
@@ -622,7 +802,7 @@ class _DraftRow extends StatelessWidget {
                 ),
               PopupMenuButton<String>(
                 tooltip: 'Draft options',
-                icon: const Icon(Icons.more_vert, size: 17),
+                icon: const Icon(Icons.more_vert, size: 18),
                 padding: EdgeInsets.zero,
                 onSelected: (value) {
                   switch (value) {

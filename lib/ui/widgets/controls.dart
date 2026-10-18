@@ -28,12 +28,17 @@ class BoundInput extends StatefulWidget {
     this.maxLength = 220,
     this.hint,
     this.showLabel = true,
+    this.compact = true,
   });
   final String value, label;
   final ValueChanged<String> onChanged;
   final int maxLines, maxLength;
   final String? hint;
   final bool showLabel;
+
+  /// Compact sizes suit the editor's side panels; `false` gives the landing
+  /// screen reading-size fields.
+  final bool compact;
   @override
   State<BoundInput> createState() => _BoundInputState();
 }
@@ -68,39 +73,46 @@ class _BoundInputState extends State<BoundInput> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      if (widget.showLabel) ...[
-        Text(
-          widget.label,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 7),
-      ],
-      Semantics(
-        label: widget.label,
-        child: TextField(
-          controller: _text,
-          onChanged: widget.onChanged,
-          maxLines: widget.maxLines,
-          maxLength: widget.maxLength,
-          buildCounter: (
-            context, {
-            required currentLength,
-            required isFocused,
-            required maxLength,
-          }) => null,
-          style: const TextStyle(fontSize: 12, height: 1.5),
-          decoration: InputDecoration(
-            hintText: widget.hint,
-            semanticCounterText:
-                '${_text.text.length} of ${widget.maxLength} characters',
+  Widget build(BuildContext context) {
+    final labelSize = widget.compact ? 11.0 : 12.5;
+    final textSize = widget.compact ? 12.0 : 14.5;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.showLabel) ...[
+          Text(
+            widget.label,
+            style: TextStyle(fontSize: labelSize, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 7),
+        ],
+        Semantics(
+          label: widget.label,
+          child: TextField(
+            controller: _text,
+            onChanged: widget.onChanged,
+            maxLines: widget.maxLines,
+            maxLength: widget.maxLength,
+            style: TextStyle(fontSize: textSize, height: 1.5),
+            buildCounter: (
+              context, {
+              required currentLength,
+              required isFocused,
+              required maxLength,
+            }) => null,
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              contentPadding: widget.compact
+                  ? null
+                  : const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              semanticCounterText:
+                  '${_text.text.length} of ${widget.maxLength} characters',
+            ),
           ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 class SectionHeading extends StatelessWidget {
