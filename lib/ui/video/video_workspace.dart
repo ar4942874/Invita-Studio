@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
@@ -44,6 +46,7 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
   String? _loadedAudioId;
   int _loadedDuration = 0;
   bool _advanced = false;
+  Timer? _settleTimer;
 
   @override
   void initState() {
@@ -63,6 +66,7 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
 
   @override
   void dispose() {
+    _settleTimer?.cancel();
     widget.studio.removeListener(_onStudioChanged);
     _playback.removeListener(_onPlaybackTick);
     _audio.dispose();
@@ -165,6 +169,40 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
     motions: widget.studio.video.motions,
   );
 
+  /// Real-time preview feedback for motion edits: replay the edited entrance
+  /// from the top (or the instant before an edited exit) so timing changes are
+  /// visible immediately on any machine, including reduced-motion ones.
+  void _onMotionEdited(LayerMotion previous, LayerMotion next) {
+    if (previous.entrance == next.entrance && previous.exit == next.exit) {
+      return;
+    }
+    if (previous.entrance != next.entrance) {
+      _playback.seek(0);
+    } else if (next.exit.isAnimated) {
+      final exitStart = (next.visibleEndMs - next.exit.durationMs - 200)
+          .clamp(0, widget.studio.video.durationMs)
+          .toInt();
+      _playback.seek(exitStart);
+    }
+    _playback.play();
+  }
+
+  /// After a motion drag ends, a reduced-motion machine lets the entrance
+  /// finish once, then settles back onto the still preview instead of keeping
+  /// the whole card running.
+  void _onMotionEditDone() {
+    if (!(MediaQuery.maybeDisableAnimationsOf(context) ?? false)) return;
+    _settleTimer?.cancel();
+    final delay =
+        widget.studio.video.settledTimeMs + 800;
+    _settleTimer = Timer(Duration(milliseconds: delay), () {
+      _settleTimer = null;
+      if (!mounted) return;
+      _playback.pause();
+      _playback.seek(0);
+    });
+  }
+
   void _applyPreset(MotionPreset preset) {
     final timeline = widget.studio.video;
     widget.studio.updateVideo(
@@ -177,10 +215,12 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
         ambient: preset.ambient,
       ),
     );
-    // Respect the OS/browser "reduce motion" setting: show the settled frame
-    // instead of auto-playing. The Play button still works when pressed.
+    // Respect the OS/browser "reduce motion" setting: stay idle on the settled
+    // frame (the idle painter draws it while the playhead rests at zero), and
+    // always restart the timer from 0 so a later Play starts over.
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
-      _playback.seek(widget.studio.video.settledTimeMs);
+      _playback.pause();
+      _playback.seek(0);
       return;
     }
     _playback.seek(0);
@@ -243,6 +283,8 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
             studio: widget.studio,
             node: selected,
             layerName: selected == null ? null : _layerName(selected),
+            onMotionEdit: _onMotionEdited,
+            onMotionEditDone: _onMotionEditDone,
           ),
         ],
       ],
@@ -740,11 +782,19 @@ class _MotionInspector extends StatefulWidget {
     required this.studio,
     required this.node,
     required this.layerName,
+    this.onMotionEdit,
+    this.onMotionEditDone,
   });
 
   final StudioController studio;
   final DesignNode? node;
   final String? layerName;
+
+  /// Fired on every motion edit (the edited value is replayed in the preview).
+  final void Function(LayerMotion previous, LayerMotion next)? onMotionEdit;
+
+  /// Fired when an editing drag finishes.
+  final VoidCallback? onMotionEditDone;
 
   @override
   State<_MotionInspector> createState() => _MotionInspectorState();
@@ -773,8 +823,11 @@ class _MotionInspectorState extends State<_MotionInspector> {
     final timeline = widget.studio.video;
     final motion = timeline.motionFor(node.id);
     void update(LayerMotion next) {
+      widget.onMotionEdit?.call(motion, next);
       widget.studio.updateVideo(timeline.withMotion(node.id, next));
     }
+
+    void endEdit() => widget.onMotionEditDone?.call();
 
     return Container(
       width: double.infinity,
@@ -823,11 +876,13 @@ class _MotionInspectorState extends State<_MotionInspector> {
                   label: 'In',
                   motion: motion.entrance,
                   onChanged: (value) => update(motion.copyWith(entrance: value)),
+                  onEditDone: endEdit,
                 ),
                 _motionEditor(
                   label: 'Out',
                   motion: motion.exit,
                   onChanged: (value) => update(motion.copyWith(exit: value)),
+                  onEditDone: endEdit,
                 ),
                 TextButton.icon(
                   onPressed: () => _applyToAll(timeline, motion),
@@ -884,6 +939,7 @@ class _MotionInspectorState extends State<_MotionInspector> {
     required String label,
     required Motion motion,
     required void Function(Motion) onChanged,
+    VoidCallback? onEditDone,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -919,7 +975,10 @@ class _MotionInspectorState extends State<_MotionInspector> {
             semanticFormatterCallback: (value) =>
                 '${(value / 1000).toStringAsFixed(1)} seconds',
             onChangeStart: (_) => widget.studio.beginVideoSession(),
-            onChangeEnd: (_) => widget.studio.endVideoSession(),
+            onChangeEnd: (value) {
+              widget.studio.endVideoSession();
+              onEditDone?.call();
+            },
             onChanged: (value) =>
                 onChanged(motion.copyWith(durationMs: value.round())),
           ),

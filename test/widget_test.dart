@@ -205,6 +205,79 @@ void main() {
     expect(find.byTooltip('Play'), findsOneWidget);
     expect(find.byTooltip('Pause'), findsNothing);
     expect(find.textContaining('System animations are off'), findsOneWidget);
+    // The playhead always restarts from zero when a preset is applied.
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Text && (w.data ?? '').startsWith('00:00.0 / '),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+  });
+  testWidgets('adjusting an entrance replays it instantly, then settles back', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(
+      tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+    );
+    final studio = await mount(tester, const Size(1440, 1000));
+    await tester.tap(find.text('Video'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('Customize'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Select a layer row (the entrance dot in its row) so the inspector shows
+    // the In/Out sliders.
+    final rowIcon = find.byWidgetPredicate(
+      (w) =>
+          w is Icon &&
+          w.size == 9 &&
+          w.icon == Icons.play_arrow_rounded &&
+          w.color == Colors.white,
+    );
+    expect(rowIcon, findsWidgets);
+    await tester.tap(rowIcon.first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final sliders = find.byWidgetPredicate(
+      (w) => w is Slider && w.max == 3000 && w.divisions == 29,
+    );
+    expect(sliders, findsNWidgets(2), reason: 'In and Out duration sliders');
+
+    // Dragging the In slider must replay the entrance straight away, even on
+    // reduced-motion machines.
+    await tester.timedDrag(
+      sliders.first,
+      const Offset(40, 0),
+      const Duration(milliseconds: 300),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+    final playhead = tester.widget<Text>(
+      find.byWidgetPredicate(
+        (w) => w is Text && RegExp(r'^\d\d:\d\d\.\d / ').hasMatch(w.data ?? ''),
+      ).first,
+    );
+    expect(
+      playhead.data,
+      isNot(equals('00:00.0 / 00:15.0')),
+      reason: 'the edited entrance should replay immediately',
+    );
+
+    // Once the drag finishes, the preview lets the entrance finish once and
+    // then settles back onto the still frame.
+    await tester.pump(const Duration(seconds: 7));
+    expect(find.byTooltip('Play'), findsOneWidget);
+    expect(studio.video.motions, isNotEmpty);
 
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
