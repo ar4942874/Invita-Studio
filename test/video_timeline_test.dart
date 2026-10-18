@@ -350,6 +350,36 @@ void main() {
       expect(slide['first'], MotionEffect.slideRight);
     });
 
+    test('the newer style presets keep distinct signatures', () {
+      Map<String, MotionEffect> effectsFor(MotionPreset preset) => {
+        for (final entry
+            in preset.build(layerIds: ids, durationMs: 15000).entries)
+          entry.key: entry.value.entrance.effect,
+      };
+      expect(effectsFor(MotionPreset.glide)['first'], MotionEffect.slideLeft);
+      expect(effectsFor(MotionPreset.dropIn)['first'], MotionEffect.slideDown);
+      expect(effectsFor(MotionPreset.bloom)['first'], MotionEffect.zoomOut);
+      expect(effectsFor(MotionPreset.unfold)['first'], MotionEffect.slideDown);
+
+      final cascade = MotionPreset.cascade.build(
+        layerIds: ids,
+        durationMs: 15000,
+      );
+      expect(
+        cascade.values.map((m) => m.entrance.delayMs),
+        anyElement(greaterThan(0)),
+        reason: 'cascade should stagger its fades',
+      );
+      final hover = MotionPreset.hover.build(
+        layerIds: ids,
+        durationMs: 15000,
+      );
+      expect(
+        hover.values.map((m) => m.entrance.easing),
+        everyElement(MotionEasing.linear),
+      );
+    });
+
     test('settledTimeMs reaches past every entrance', () {
       const timeline = VideoTimeline(durationMs: 15000);
       expect(timeline.settledTimeMs, 0);

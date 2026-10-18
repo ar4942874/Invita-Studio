@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../application/app_settings.dart';
 import '../application/studio_controller.dart';
 import '../domain/project.dart';
+import '../domain/video/timeline.dart' show MotionPreset;
 import '../l10n/app_localizations.dart';
 import '../services/file_actions.dart';
 import 'event_settings_sheet.dart';
@@ -67,7 +68,22 @@ class _StudioScreenState extends State<StudioScreen>
     FocusScope.of(context).unfocus();
     if (value) {
       final timeline = studio.video;
-      studio.updateVideo(timeline.copyWith(enabled: true));
+      if (timeline.motions.isEmpty) {
+        // First time in video mode: the card starts with the gentle whole-card
+        // slide style instead of a frozen frame.
+        studio.updateVideo(
+          timeline.copyWith(
+            enabled: true,
+            motions: MotionPreset.slide.build(
+              layerIds: studio.project.layerIds.toList(),
+              durationMs: timeline.durationMs,
+            ),
+            ambient: MotionPreset.slide.ambient,
+          ),
+        );
+      } else {
+        studio.updateVideo(timeline.copyWith(enabled: true));
+      }
     }
     setState(() => _videoMode = value);
   }

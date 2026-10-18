@@ -213,6 +213,8 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
             ),
           ),
         ),
+        if (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+          _ReduceMotionHint(compact: widget.compact),
         _Transport(
           playback: _playback,
           timeline: timeline,
@@ -244,6 +246,47 @@ class _VideoWorkspaceState extends State<VideoWorkspace>
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Shown when the OS asks for reduced motion and the preview therefore stays on
+/// a settled frame, so the frozen card never looks like a broken animation.
+class _ReduceMotionHint extends StatelessWidget {
+  const _ReduceMotionHint({required this.compact});
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: StudioColors.accentSoft,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          compact ? 12 : 16,
+          5,
+          compact ? 12 : 16,
+          5,
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.info_outline,
+              size: 13,
+              color: StudioColors.muted,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'System animations are off, so the preview stays still. '
+                'Press Play to see the motion.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10, color: StudioColors.ink),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -915,6 +958,18 @@ IconData _presetIcon(MotionPreset preset) => switch (preset) {
   MotionPreset.pop => Icons.auto_awesome,
   MotionPreset.slide => Icons.swap_horiz,
   MotionPreset.stagger => Icons.view_timeline_outlined,
+  MotionPreset.cascade => Icons.waterfall_chart,
+  MotionPreset.glide => Icons.double_arrow_rounded,
+  MotionPreset.dropIn => Icons.arrow_downward_rounded,
+  MotionPreset.sweep => Icons.compare_arrows,
+  MotionPreset.expand => Icons.open_in_full,
+  MotionPreset.unfold => Icons.vertical_align_bottom,
+  MotionPreset.bloom => Icons.local_florist,
+  MotionPreset.popCascade => Icons.grid_view,
+  MotionPreset.floatIn => Icons.opacity,
+  MotionPreset.blinds => Icons.table_rows,
+  MotionPreset.shimmer => Icons.auto_fix_high,
+  MotionPreset.hover => Icons.center_focus_weak,
 };
 
 /// The layman-facing animation picker: one tap animates the whole card.

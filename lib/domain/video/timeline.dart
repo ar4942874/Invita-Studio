@@ -236,16 +236,28 @@ enum MotionPreset {
   zoomOut('zoomOut', 'Zoom out', 'The card settles in from larger'),
   pop('pop', 'Pop', 'Layers spring in with a light bounce'),
   slide('slide', 'Slide in', 'Layers glide in from the sides'),
-  stagger('stagger', 'One by one', 'Layers appear in a gentle sequence');
+  stagger('stagger', 'One by one', 'Layers appear in a gentle sequence'),
+  cascade('cascade', 'Cascade', 'A soft wave of fades, one after another'),
+  glide('glide', 'Glide in', 'The card glides sideways into place'),
+  dropIn('dropIn', 'Light drop', 'Layers fall softly with a bounce'),
+  sweep('sweep', 'Side wave', 'A wave runs from the sides in order'),
+  expand('expand', 'Grow in', 'Layers grow bigger one by one'),
+  unfold('unfold', 'Pour down', 'Layers slide down into place in order'),
+  bloom('bloom', 'Bloom open', 'The card blooms out from the middle'),
+  popCascade('popCascade', 'Pop by one', 'Layers pop in one at a time'),
+  floatIn('floatIn', 'Float', 'A gentle fade with a slow drift'),
+  blinds('blinds', 'Slides and fades', 'Slides and fades mix in sequence'),
+  shimmer('shimmer', 'Ripple', 'Zooms and fades ripple across the card'),
+  hover('hover', 'Drift zoom', 'A quiet zoom deepens the whole time');
 
   const MotionPreset(this.wireName, this.label, this.tagline);
   final String wireName;
   final String label;
   final String tagline;
 
-  /// Entrance length shared by every preset. Deliberately unhurried so the
-  /// card glides into place instead of snapping.
-  static const int entranceMs = 1800;
+  /// Entrance length shared by every preset. Deliberately slow so the card
+  /// glides into place instead of snapping, and stays easy to follow on phone.
+  static const int entranceMs = 2400;
 
   /// Builds the per-layer motions a preset writes over a clean window.
   ///
@@ -342,6 +354,116 @@ enum MotionPreset {
               ),
             ),
         };
+      case MotionPreset.cascade:
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(
+                MotionEffect.fade,
+                easing: MotionEasing.easeInOut,
+                delayMs: staggerDelay(i),
+              ),
+            ),
+        };
+      case MotionPreset.glide:
+        return {
+          for (final id in layerIds)
+            id: layer(
+              entrance(MotionEffect.slideLeft, easing: MotionEasing.easeInOut),
+            ),
+        };
+      case MotionPreset.dropIn:
+        return {
+          for (final id in layerIds)
+            id: layer(
+              entrance(MotionEffect.slideDown, easing: MotionEasing.easeOutBack),
+            ),
+        };
+      case MotionPreset.sweep:
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(
+                i.isEven ? MotionEffect.slideLeft : MotionEffect.slideRight,
+                easing: MotionEasing.easeInOut,
+                delayMs: staggerDelay(i),
+              ),
+            ),
+        };
+      case MotionPreset.expand:
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(
+                MotionEffect.zoomIn,
+                easing: MotionEasing.easeOutCubic,
+                delayMs: staggerDelay(i),
+              ),
+            ),
+        };
+      case MotionPreset.unfold:
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(
+                MotionEffect.slideDown,
+                easing: MotionEasing.easeOutCubic,
+                delayMs: staggerDelay(i),
+              ),
+            ),
+        };
+      case MotionPreset.bloom:
+        return {
+          for (final id in layerIds)
+            id: layer(
+              entrance(MotionEffect.zoomOut, easing: MotionEasing.easeOutBack),
+            ),
+        };
+      case MotionPreset.popCascade:
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(
+                MotionEffect.zoomIn,
+                easing: MotionEasing.easeOutBack,
+                delayMs: staggerDelay(i),
+              ),
+            ),
+        };
+      case MotionPreset.floatIn:
+        return {
+          for (final id in layerIds)
+            id: layer(entrance(MotionEffect.fade, easing: MotionEasing.easeOut)),
+        };
+      case MotionPreset.blinds:
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(
+                i.isEven ? MotionEffect.slideDown : MotionEffect.fade,
+                easing: MotionEasing.easeInOut,
+                delayMs: staggerDelay(i),
+              ),
+            ),
+        };
+      case MotionPreset.shimmer:
+        return {
+          for (var i = 0; i < count; i++)
+            layerIds[i]: layer(
+              entrance(
+                i.isEven ? MotionEffect.zoomIn : MotionEffect.fade,
+                easing: MotionEasing.easeInOut,
+                delayMs: staggerDelay(i),
+              ),
+            ),
+        };
+      case MotionPreset.hover:
+        return {
+          for (final id in layerIds)
+            id: layer(
+              entrance(MotionEffect.zoomIn, easing: MotionEasing.linear),
+            ),
+        };
     }
   }
 
@@ -356,6 +478,18 @@ enum MotionPreset {
     MotionPreset.pop => AmbientMotion.breathe,
     MotionPreset.slide => AmbientMotion.drift,
     MotionPreset.stagger => AmbientMotion.drift,
+    MotionPreset.cascade => AmbientMotion.breathe,
+    MotionPreset.glide => AmbientMotion.drift,
+    MotionPreset.dropIn => AmbientMotion.drift,
+    MotionPreset.sweep => AmbientMotion.zoom,
+    MotionPreset.expand => AmbientMotion.zoom,
+    MotionPreset.unfold => AmbientMotion.drift,
+    MotionPreset.bloom => AmbientMotion.breathe,
+    MotionPreset.popCascade => AmbientMotion.breathe,
+    MotionPreset.floatIn => AmbientMotion.drift,
+    MotionPreset.blinds => AmbientMotion.drift,
+    MotionPreset.shimmer => AmbientMotion.breathe,
+    MotionPreset.hover => AmbientMotion.zoom,
   };
 
   /// Whether [motions] is exactly what this preset writes for [layerIds].

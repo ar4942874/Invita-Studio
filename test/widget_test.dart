@@ -149,7 +149,16 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Animation'), findsOneWidget);
-    expect(studio.video.motions, isEmpty);
+    // Entering video mode defaults to the gentle whole-card slide style.
+    expect(studio.video.enabled, isTrue);
+    expect(
+      MotionPreset.detect(
+        layerIds: studio.project.layerIds,
+        durationMs: studio.video.durationMs,
+        motions: studio.video.motions,
+      ),
+      MotionPreset.slide,
+    );
 
     await tester.tap(find.text('Rise up'));
     await tester.pump();
@@ -163,6 +172,9 @@ void main() {
       ),
       isTrue,
     );
+    // Normal machines auto-play straight away instead of settling.
+    expect(find.byTooltip('Pause'), findsOneWidget);
+    expect(find.textContaining('System animations are off'), findsNothing);
     // Let the debounced autosave fire so no timer outlives the test.
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
@@ -188,9 +200,11 @@ void main() {
 
     expect(studio.video.enabled, isTrue);
     expect(studio.video.motions, isNotEmpty);
-    // The preset applied but playback stayed idle at the settled frame.
+    // The preset applied but playback stayed idle at the settled frame, and
+    // the frozen state is explained on screen instead of looking broken.
     expect(find.byTooltip('Play'), findsOneWidget);
     expect(find.byTooltip('Pause'), findsNothing);
+    expect(find.textContaining('System animations are off'), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
