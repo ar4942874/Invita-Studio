@@ -451,6 +451,49 @@ class _TemplatesPanelState extends State<TemplatesPanel> {
       ),
       const SizedBox(height: 8),
       _selectedPreview(),
+      const SizedBox(height: 14),
+      _compositionPicker(),
+    ],
+  );
+
+  /// Switches the applied design's arrangement, keeping every word.
+  ///
+  /// The catalogue already spreads its designs across the three compositions;
+  /// this lets one design be taken in any of them, so a host can change the
+  /// card's whole feel without losing the design they picked.
+  Widget _compositionPicker() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          const TinyLabel('Composition'),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _studio.layout?.blurb ?? 'Layers moved — pick one to reset',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 9, color: StudioColors.muted),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 7),
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final layout in InvitationLayout.values)
+            _FilterChip(
+              label: layout.label,
+              selected: _studio.layout == layout,
+              onTap: () {
+                FocusScope.of(context).unfocus();
+                _studio.chooseLayout(layout);
+              },
+            ),
+        ],
+      ),
     ],
   );
 

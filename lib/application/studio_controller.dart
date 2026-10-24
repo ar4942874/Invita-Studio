@@ -238,8 +238,40 @@ class StudioController extends ChangeNotifier {
     _committedDocument = document;
   }
   DesignDocument get document => editor.document;
-  InvitationTemplate get template => templateFor(document);
+
+  /// The applied design, in the composition the card is actually drawn in.
+  ///
+  /// [_designByArt] answers with the design's default arrangement, so a card
+  /// switched to another composition would otherwise be reported (and given
+  /// back on a format change) in the wrong one.
+  InvitationTemplate get template {
+    final base = templateFor(document);
+    final detected = layout;
+    return detected == null ? base : base.withLayout(detected);
+  }
+
   InvitationFormat get format => formatFor(document);
+
+  /// The composition the card is drawn in, or `null` when the layers have been
+  /// moved far enough that no arrangement fits.
+  InvitationLayout? get layout {
+    final base = templateFor(document);
+    if (_layoutKnown &&
+        identical(document, _layoutForDocument) &&
+        identical(base, _layoutForTemplate)) {
+      return _layout;
+    }
+    _layoutForDocument = document;
+    _layoutForTemplate = base;
+    _layoutKnown = true;
+    _layout = detectLayout(document, template: base);
+    return _layout;
+  }
+
+  DesignDocument? _layoutForDocument;
+  InvitationTemplate? _layoutForTemplate;
+  InvitationLayout? _layout;
+  bool _layoutKnown = false;
   TextNode? get selectedText => editor.state.selectedNode is TextNode
       ? editor.state.selectedNode as TextNode
       : null;
@@ -333,6 +365,14 @@ class StudioController extends ChangeNotifier {
     _markUsed(target.id);
     return _reflow(target, format);
   }
+
+  /// Redraws the current design in another composition.
+  ///
+  /// The words, photos and custom layers are kept — only the arrangement of the
+  /// linked fields changes, and it is a single undo step.
+  Future<void> chooseLayout(InvitationLayout target) =>
+      chooseTemplate(template.withLayout(target));
+
   Future<void> chooseFormat(InvitationFormat target) =>
       _reflow(template, target, preserveStyle: true);
   Future<void> resetLayout() => _reflow(template, format, keepExtras: false);
