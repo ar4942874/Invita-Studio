@@ -89,6 +89,94 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('"All designs" pages instead of building sixty tiles', (
+    tester,
+  ) async {
+    final studio = await _studio();
+    addTearDown(studio.dispose);
+    await _pump(tester, TemplatesPanel(studio: studio), studio: studio);
+
+    await tester.tap(find.text('All designs'));
+    await tester.pumpAndSettle();
+
+    // The whole catalogue is still counted...
+    expect(find.text('60 designs'), findsOneWidget);
+    // ...but only the rows in the viewport exist. The old Wrap built and
+    // decoded all sixty at once.
+    final built = find.byWidgetPredicate(
+      (widget) =>
+          widget.key is ValueKey<String> &&
+          (widget.key! as ValueKey<String>).value.startsWith('design_'),
+    );
+    expect(built.evaluate().length, lessThan(10));
+    expect(
+      find.byKey(const ValueKey('design_arches_birthday')),
+      findsNothing,
+      reason: 'the 25th design is on page two and must not be built',
+    );
+
+    final showMore = find.textContaining('Show more');
+
+    /// Scrolls [finder] into the viewport. A sliver builds a little past the
+    /// viewport (cache extent), so finding it is not the same as seeing it —
+    /// a tap on a cached-but-offscreen widget misses.
+    Future<void> reveal(Finder finder) async {
+      await tester.scrollUntilVisible(
+        finder,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+    }
+
+    await reveal(showMore);
+    expect(find.text('Show more (36 left)'), findsOneWidget);
+    expect(find.byKey(const ValueKey('design_arches_birthday')), findsNothing);
+
+    // One page more: the second page starts with the 25th design.
+    await tester.tap(showMore);
+    await tester.pumpAndSettle();
+    await reveal(find.byKey(const ValueKey('design_arches_birthday')));
+    expect(
+      find.byKey(const ValueKey('design_arches_birthday')),
+      findsOneWidget,
+    );
+    await reveal(showMore);
+    expect(find.text('Show more (12 left)'), findsOneWidget);
+
+    // All sixty are in, so the button retires rather than hanging around.
+    await tester.tap(showMore);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Show more'), findsNothing);
+    await reveal(find.byKey(const ValueKey('design_sunburst_other')));
+    expect(find.byKey(const ValueKey('design_sunburst_other')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await studio.saveNow();
+  });
+
+  testWidgets('design tiles decode thumbnails at their display width', (
+    tester,
+  ) async {
+    final studio = await _studio();
+    addTearDown(studio.dispose);
+    await _pump(tester, TemplatesPanel(studio: studio), studio: studio);
+
+    final tile = find.byKey(const ValueKey('design_botanical_wedding'));
+    expect(tile, findsOneWidget);
+    final image = tester.widget<Image>(
+      find.descendant(of: tile, matching: find.byType(Image)),
+    );
+    // `cacheWidth` is applied by wrapping the provider in a ResizeImage; that
+    // is the value that bounds the decoded bitmap.
+    final decode = image.image as ResizeImage;
+    // A 167 px tile at DPR 1 decodes at its own size, never the 360 px source
+    // and certainly not the 2160 px artwork.
+    expect(decode.width, isNotNull);
+    expect(decode.width, lessThanOrEqualTo(360));
+    expect(decode.width, greaterThanOrEqualTo(160));
+  });
+
   testWidgets('starring a design puts it in favourites', (tester) async {
     final studio = await _studio();
     addTearDown(studio.dispose);

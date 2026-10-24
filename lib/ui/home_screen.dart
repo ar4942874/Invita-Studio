@@ -693,7 +693,12 @@ class _CardTile extends StatelessWidget {
                     borderRadius: const BorderRadius.all(Radius.circular(10)),
                     child: AspectRatio(
                       aspectRatio: 1080 / 1512,
-                      child: DocumentPreview(document: document),
+                      // ~300 px wide on a phone: 600 physical px is crisp
+                      // without decoding the full 2160 px artwork ten times.
+                      child: DocumentPreview(
+                        document: document,
+                        decodeWidth: 600,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),

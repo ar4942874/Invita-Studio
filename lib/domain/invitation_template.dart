@@ -548,14 +548,49 @@ List<InvitationTemplate> templatesFor(InvitationCategory category) {
   return designs.isEmpty ? catalogueTemplates.take(10).toList() : designs;
 }
 
+/// Every bundled background path the app is allowed to render.
+///
+/// Derived once: the image provider consulted this on every image load and
+/// rebuilt the whole 207-string set each time.
+final Set<String> invitationArtAssets = Set<String>.unmodifiable({
+  for (final format in InvitationFormat.values)
+    ...invitationArtAssetsFor(format),
+});
+
+/// The bundled backgrounds that belong to one format, for the importer's
+/// allowlist. Built once per format.
+final Map<InvitationFormat, Set<String>> _artByFormat = {
+  for (final format in InvitationFormat.values)
+    format: Set<String>.unmodifiable({
+      for (final template in invitationTemplates) template.art(format),
+    }),
+};
+
+Set<String> invitationArtAssetsFor(InvitationFormat format) =>
+    _artByFormat[format]!;
+
+/// Background asset path → the design that draws it.
+///
+/// A document is resolved back to its design on open, on import and on every
+/// restore. That used to be a 69 × 3 string scan; this index is built once and
+/// does not grow with the number of lookups. First registration wins, matching
+/// the old scan order, so a legacy layout keeps the design it always resolved
+/// to.
+final Map<String, InvitationTemplate> _designByArt = () {
+  final index = <String, InvitationTemplate>{};
+  for (final template in invitationTemplates) {
+    for (final format in InvitationFormat.values) {
+      index.putIfAbsent(template.art(format), () => template);
+    }
+  }
+  return Map<String, InvitationTemplate>.unmodifiable(index);
+}();
+
 InvitationTemplate templateFor(DesignDocument doc) {
   final asset = doc.nodes.whereType<BackgroundNode>().firstOrNull?.assetId;
   if (asset != null) {
-    for (final template in invitationTemplates) {
-      for (final format in InvitationFormat.values) {
-        if (template.art(format) == asset) return template;
-      }
-    }
+    final design = _designByArt[asset];
+    if (design != null) return design;
   }
   return invitationTemplates.first;
 }
@@ -599,7 +634,8 @@ TextStyle nodeTextStyle(TextNode node, {double? size}) => TextStyle(
 );
 
 /// Keep the entire value, shrinking only when needed. No truncation/ellipsis.
-TextNode fitTextNode(TextNode node, {double? maxHeight}) {  final allowed = maxHeight ?? node.frame.height;
+TextNode fitTextNode(TextNode node, {double? maxHeight}) {
+  final allowed = maxHeight ?? node.frame.height;
   final painter = TextPainter(
     textDirection: invitationTextDirection(node.text),
   );

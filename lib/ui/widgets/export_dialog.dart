@@ -220,7 +220,10 @@ class _ExportDialogState extends State<ExportDialog> {
                         width: 67,
                         height: 94,
                         child: _file == null
-                            ? DocumentPreview(document: studio.document)
+                            ? DocumentPreview(
+                                document: studio.document,
+                                decodeWidth: 240,
+                              )
                             : Image.memory(_file!.bytes, fit: BoxFit.contain),
                       ),
                       const SizedBox(width: 17),

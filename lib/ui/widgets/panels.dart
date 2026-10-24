@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
@@ -179,6 +181,8 @@ class DetailsPanel extends StatelessWidget {
                 child: Image.asset(
                   studio.template.thumbnail,
                   fit: BoxFit.cover,
+                  // 34 px wide: decoding the full 360 px thumb is waste.
+                  cacheWidth: 120,
                 ),
               ),
             ),
@@ -257,9 +261,35 @@ class TemplatesPanel extends StatefulWidget {
 ///
 /// Legacy layouts are never listed — they exist only so older drafts resolve.
 class _TemplatesPanelState extends State<TemplatesPanel> {
+  /// Designs rendered before the user asks for more.
+  ///
+  /// The catalogue multiplies (motifs × celebration palettes), so the picker
+  /// pages instead of building every tile at once. Only the rows on screen are
+  /// built, and each thumbnail decodes at its display width — sixty tiles used
+  /// to cost ~43 MB of decoded bitmaps before the user had scrolled at all.
+  static const int _pageSize = 24;
+
   _CatalogTab _tab = _CatalogTab.forYou;
+  int _visible = _pageSize;
+  final ScrollController _scroll = ScrollController();
 
   StudioController get _studio => widget.studio;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _selectTab(_CatalogTab tab) {
+    if (tab == _tab) return;
+    setState(() {
+      _tab = tab;
+      // A different slice starts at its own first page, at the top.
+      _visible = _pageSize;
+    });
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
 
   List<InvitationTemplate> get _designs {
     final favourites = _studio.favourites;
@@ -298,97 +328,170 @@ class _TemplatesPanelState extends State<TemplatesPanel> {
     listenable: _studio,
     builder: (context, _) {
       final designs = _designs;
-      return ListView(
-        padding: const EdgeInsets.all(23),
-        children: [
-          const SectionHeading(
-            'Find your feeling.',
-            subtitle:
-                'Ten designs for your celebration, sixty in the catalogue. '
-                'Your words stay put when you switch.',
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final tab in _CatalogTab.values)
-                _FilterChip(
-                  label: tab.label,
-                  selected: _tab == tab,
-                  onTap: () => setState(() => _tab = tab),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                '${designs.length} '
-                '${designs.length == 1 ? 'design' : 'designs'}',
-                style: const TextStyle(
-                  fontSize: 9.5,
-                  color: StudioColors.muted,
-                ),
+      final visible = designs.take(_visible).toList();
+      final remaining = designs.length - visible.length;
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          const gutter = 23.0;
+          const gap = 10.0;
+          // Two columns whenever they fit; a dense side panel or a very narrow
+          // phone falls back to one rather than overflowing the row.
+          final available = math.max(0.0, constraints.maxWidth - gutter * 2);
+          final columns = available >= 250 ? 2 : 1;
+          final tileWidth = columns == 2
+              ? (available - gap) / 2
+              : available;
+          // The bundled thumbnails are 360 px wide; asking for more than that
+          // only grows the decoded bitmap, asking for less saves memory.
+          final ratio = MediaQuery.devicePixelRatioOf(context);
+          final decodeWidth = (tileWidth * ratio).clamp(160.0, 360.0).round();
+          final rows = (visible.length + columns - 1) ~/ columns;
+          return CustomScrollView(
+            controller: _scroll,
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(gutter, gutter, gutter, 0),
+                sliver: SliverToBoxAdapter(child: _header(designs)),
               ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: designs.isEmpty ? null : _surprise,
-                icon: const Icon(Icons.shuffle, size: 14),
-                label: const Text(
-                  'Surprise me',
-                  style: TextStyle(fontSize: 10.5),
-                ),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  minimumSize: const Size(0, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _selectedPreview(),
-          const SizedBox(height: 16),
-          if (designs.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              child: Text(
-                _emptyHint,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: StudioColors.muted,
-                ),
-              ),
-            )
-          else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                const gap = 10.0;
-                final width = (constraints.maxWidth - gap) / 2;
-                return Wrap(
-                  spacing: gap,
-                  runSpacing: 14,
-                  children: [
-                    for (final template in designs)
-                      SizedBox(
-                        width: width,
-                        child: _DesignTile(
-                          studio: _studio,
-                          template: template,
-                        ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(gutter, 16, gutter, 0),
+                sliver: designs.isEmpty
+                    ? SliverToBoxAdapter(child: _emptyState())
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate((context, row) {
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              bottom: row == rows - 1 ? 0 : 14,
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (var slot = 0; slot < columns; slot++) ...[
+                                  if (slot > 0) const SizedBox(width: gap),
+                                  SizedBox(
+                                    width: tileWidth,
+                                    child: _tile(
+                                      visible,
+                                      row * columns + slot,
+                                      decodeWidth,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }, childCount: rows),
                       ),
-                  ],
-                );
-              },
-            ),
-          const SizedBox(height: 10),
-          const HintBox(
-            'Switching a design keeps your words and custom text. Linked layers get the new design’s layout and styling. Undo brings everything back.',
-          ),
-        ],
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(gutter, 10, gutter, gutter),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      if (remaining > 0) _showMore(remaining),
+                      const HintBox(
+                        'Switching a design keeps your words and custom text. Linked layers get the new design’s layout and styling. Undo brings everything back.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       );
     },
+  );
+
+  /// Everything above the grid: the heading, the tabs and the applied design.
+  Widget _header(List<InvitationTemplate> designs) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const SectionHeading(
+        'Find your feeling.',
+        subtitle:
+            'Ten designs for your celebration, sixty in the catalogue. '
+            'Your words stay put when you switch.',
+      ),
+      const SizedBox(height: 14),
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final tab in _CatalogTab.values)
+            _FilterChip(
+              label: tab.label,
+              selected: _tab == tab,
+              onTap: () => _selectTab(tab),
+            ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Text(
+            '${designs.length} ${designs.length == 1 ? 'design' : 'designs'}',
+            style: const TextStyle(fontSize: 9.5, color: StudioColors.muted),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: designs.isEmpty ? null : _surprise,
+            icon: const Icon(Icons.shuffle, size: 14),
+            label: const Text(
+              'Surprise me',
+              style: TextStyle(fontSize: 10.5),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      _selectedPreview(),
+    ],
+  );
+
+  Widget _emptyState() => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 18),
+    child: Text(
+      _emptyHint,
+      style: const TextStyle(fontSize: 11, color: StudioColors.muted),
+    ),
+  );
+
+  /// One grid slot. The odd slot of the last row stays empty so the row keeps
+  /// its width instead of stretching the final tile.
+  Widget _tile(List<InvitationTemplate> visible, int index, int decodeWidth) {
+    if (index >= visible.length) return const SizedBox.shrink();
+    final template = visible[index];
+    return _DesignTile(
+      key: ValueKey('design_${template.id}'),
+      studio: _studio,
+      template: template,
+      decodeWidth: decodeWidth,
+    );
+  }
+
+  Widget _showMore(int remaining) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Center(
+      child: OutlinedButton.icon(
+        onPressed: () => setState(() => _visible += _pageSize),
+        icon: const Icon(Icons.expand_more, size: 16),
+        label: Text(
+          'Show more ($remaining left)',
+          style: const TextStyle(fontSize: 10.5),
+        ),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
+    ),
   );
 
   /// The applied design, shown large enough to judge it with the host's own
@@ -408,7 +511,10 @@ class _TemplatesPanelState extends State<TemplatesPanel> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: ExcludeSemantics(
-              child: DocumentPreview(document: _studio.document),
+              child: DocumentPreview(
+                document: _studio.document,
+                decodeWidth: 240,
+              ),
             ),
           ),
         ),
@@ -492,10 +598,19 @@ class _FilterChip extends StatelessWidget {
 /// One design in the grid: the bundled thumbnail, its motif name, the palette
 /// it was drawn in, and a star.
 class _DesignTile extends StatelessWidget {
-  const _DesignTile({required this.studio, required this.template});
+  const _DesignTile({
+    super.key,
+    required this.studio,
+    required this.template,
+    required this.decodeWidth,
+  });
 
   final StudioController studio;
   final InvitationTemplate template;
+
+  /// Physical pixels to decode the thumbnail at: the tile's display width
+  /// times the device pixel ratio, capped at the bundled 360 px source.
+  final int decodeWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -531,6 +646,10 @@ class _DesignTile extends StatelessWidget {
                       child: Image.asset(
                         template.thumbnail,
                         fit: BoxFit.cover,
+                        // Decode at the size the tile actually draws. Without
+                        // this every tile held a full-size bitmap whether or
+                        // not it was on screen.
+                        cacheWidth: decodeWidth,
                         // The tile already names the design; a second label
                         // here would be read twice.
                         excludeFromSemantics: true,

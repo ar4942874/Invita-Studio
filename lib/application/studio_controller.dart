@@ -33,11 +33,7 @@ class StudioController extends ChangeNotifier {
         // Photos the host itself produced are embedded as bounded data URLs.
         final bytes = photoBytesFromDataUrl(asset);
         if (bytes != null) return MemoryImage(bytes);
-        final allowed = {
-          for (final t in invitationTemplates)
-            for (final f in InvitationFormat.values) t.art(f),
-        };
-        if (!allowed.contains(asset)) {
+        if (!invitationArtAssets.contains(asset)) {
           throw StateError('Untrusted image asset.');
         }
         return AssetImage(asset!);

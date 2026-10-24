@@ -189,11 +189,12 @@ class StudioProject {
       var backgrounds = 0;
       var photos = 0;
       String? asset;
-      final validAssets = {
-        for (final t in invitationTemplates)
-          for (final f in InvitationFormat.values)
-            if (f.height == raw['height']) t.art(f),
-      };
+      final validAssets = invitationArtAssetsFor(
+        InvitationFormat.values.firstWhere(
+          (f) => f.height == raw['height'],
+          orElse: () => InvitationFormat.classic,
+        ),
+      );
       bool number(dynamic value, double min, double max) =>
           value is num && value.isFinite && value >= min && value <= max;
       bool color(dynamic value) =>

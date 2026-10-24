@@ -239,6 +239,34 @@ void main() {
     });
   }
 
+  test('a document resolves to its design by background asset', () {
+    // The picker, the importer and every draft restore look a document's
+    // design up by its background. This used to be a 69 x 3 string scan; the
+    // index must answer exactly what that scan answered.
+    for (final template in invitationTemplates) {
+      for (final format in InvitationFormat.values) {
+        final doc = template.createDocument(
+          documentId: 'lookup',
+          format: format,
+        );
+        expect(
+          templateFor(doc).id,
+          template.id,
+          reason: '${template.id} / ${format.name}',
+        );
+      }
+    }
+
+    // The importer's allowlist is the union of the per-format allowlists, and
+    // each format admits exactly one background per design.
+    expect(invitationArtAssets, hasLength(invitationTemplates.length * 3));
+    for (final format in InvitationFormat.values) {
+      final assets = invitationArtAssetsFor(format);
+      expect(assets, hasLength(invitationTemplates.length));
+      expect(assets.every(invitationArtAssets.contains), isTrue);
+    }
+  });
+
   test('project import rejects excessive input before parsing', () {
     expect(
       () => StudioProject.decode(' ' * (StudioProject.maxProjectBytes + 1)),
