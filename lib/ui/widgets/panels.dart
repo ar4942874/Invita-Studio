@@ -7,6 +7,8 @@ import '../../application/studio_controller.dart';
 import '../../domain/invitation_template.dart';
 import '../../services/invite_actions.dart';
 import '../../services/photo_service.dart';
+import '../guide/guide_scope.dart';
+import '../guide/guide_stop.dart';
 import '../invite_actions_sheet.dart';
 import '../schedule_picker.dart';
 import '../studio_theme.dart';
@@ -44,16 +46,21 @@ class DetailsPanel extends StatelessWidget {
   final VoidCallback onTemplates;
   Widget field(String id) {
     final spec = invitationFields.firstWhere((f) => f.id == id);
+    final input = BoundInput(
+      key: ValueKey('field_$id'),
+      value: studio.fieldValue(id),
+      onChanged: (v) => studio.setField(id, v),
+      label: spec.label,
+      maxLines: spec.lines,
+      maxLength: spec.maxLength,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
-      child: BoundInput(
-        key: ValueKey('field_$id'),
-        value: studio.fieldValue(id),
-        onChanged: (v) => studio.setField(id, v),
-        label: spec.label,
-        maxLines: spec.lines,
-        maxLength: spec.maxLength,
-      ),
+      // The guided tour points at the first name field to make the point that
+      // every design reads its words from here.
+      child: id == 'first'
+          ? GuideTarget(anchor: GuideAnchors.words, radius: 10, child: input)
+          : input,
     );
   }
 

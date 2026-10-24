@@ -202,6 +202,7 @@ class _VideoPreviewState extends State<VideoPreview> {
         _renderer = TimelineFrameRenderer(
           document: document,
           imageCache: _images,
+          focusLight: widget.studio.project.focusLight,
         );
         _revision++;
       });
@@ -231,6 +232,7 @@ class _VideoPreviewState extends State<VideoPreview> {
       _renderer = TimelineFrameRenderer(
         document: widget.studio.document,
         imageCache: _images,
+        focusLight: widget.studio.project.focusLight,
       );
       _revision++;
       _loadingImages = false;

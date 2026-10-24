@@ -3,8 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
+import '../../domain/focus_light.dart';
 import '../../domain/invitation_template.dart';
 import '../../services/photo_service.dart';
+import 'focus_light_layer.dart';
 
 BoxFit boxFitFromName(String fit) => switch (fit) {
   'contain' => BoxFit.contain,
@@ -34,9 +36,14 @@ class DocumentPreview extends StatelessWidget {
     super.key,
     required this.document,
     this.decodeWidth = 420,
+    this.focusLight = FocusLightSetting.none,
   });
 
   final DesignDocument document;
+
+  /// The card's light. Off by default so a plain template preview (the home
+  /// picker) needs no project to render.
+  final FocusLightSetting focusLight;
 
   /// Physical pixels each bitmap is decoded at.
   ///
@@ -121,6 +128,8 @@ class DocumentPreview extends StatelessWidget {
                         ),
                       ),
                     ),
+                if (!focusLight.isOff)
+                  Positioned.fill(child: FocusLightLayer(setting: focusLight)),
               ],
             ),
           ),

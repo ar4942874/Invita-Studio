@@ -8,6 +8,7 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 import '../domain/category_music.dart';
 import '../domain/event_schedule.dart';
+import '../domain/focus_light.dart';
 import '../domain/invitation_template.dart';
 import '../domain/project.dart';
 import '../domain/video/timeline.dart';
@@ -108,6 +109,9 @@ class StudioController extends ChangeNotifier {
 
   /// Snapshot taken when a slider drag starts, so the whole drag is one step.
   VideoTimeline? _videoSession;
+
+  /// Same idea for the focus-light sheet's intensity slider.
+  FocusLightSetting? _focusSession;
   bool _resettingHistory = false;
   final Map<String, String> _pendingFields = {};
   Future<void> _queue = Future.value();
@@ -183,6 +187,42 @@ class StudioController extends ChangeNotifier {
     _upsert(_project);
     _scheduleSave();
     notifyListeners();
+  }
+
+  /// The light currently thrown across the card.
+  FocusLightSetting get focusLight => _project.focusLight;
+
+  /// Swaps the light (or its strength) and schedules the usual autosave.
+  ///
+  /// Joins the shared undo history: a preset tap is one step, a whole slider
+  /// drag is one step when wrapped in [beginFocusSession]/[endFocusSession].
+  void updateFocusLight(FocusLightSetting value) {
+    if (_disposed) return;
+    final before = _project.focusLight;
+    if (before == value) return;
+    _project = _project.copyWith(focusLight: value);
+    if (_focusSession == null) _recordFocus(before, value);
+    _upsert(_project);
+    _scheduleSave();
+    notifyListeners();
+  }
+
+  void beginFocusSession() {
+    _focusSession ??= _project.focusLight;
+  }
+
+  void endFocusSession() {
+    final before = _focusSession;
+    _focusSession = null;
+    if (before != null) _recordFocus(before, _project.focusLight);
+  }
+
+  void _recordFocus(FocusLightSetting before, FocusLightSetting after) {
+    if (before == after) return;
+    _truncateRedo();
+    _history.add(_HistoryEntry(isVideo: false, before: before, after: after));
+    _cursor = _history.length;
+    _trimHistory();
   }
 
   /// Starts coalescing a run of [updateVideo] calls (e.g. a slider drag) into
@@ -348,6 +388,12 @@ class StudioController extends ChangeNotifier {
   /// Restores one side of a history entry (the "before" on undo, the "after" on
   /// redo), whether it holds a document or a video timeline.
   Future<void> _restoreHistory(Object? value) async {
+    if (value is FocusLightSetting) {
+      _project = _project.copyWith(focusLight: value);
+      _upsert(_project);
+      _scheduleSave();
+      return;
+    }
     if (value is VideoTimeline) {
       _project = _project.copyWith(video: value);
       _upsert(_project);

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'occasion_theme.dart';
+
 /// Design tokens adapted from the OpenDesign `premium` design system:
 /// a warm-white canvas, graphite type, and a muted bronze signal.
 ///
@@ -106,7 +108,132 @@ const studioPageGradient = LinearGradient(
   ],
 );
 
-ThemeData studioTheme() => ThemeData(
+/// The app theme.
+///
+/// Without an [occasion] this is the neutral Premium chrome the app has always
+/// used. With one, the palette, the signal colour and every Material control
+/// follow that celebration — buttons, inputs, sliders, dialogs, chips and
+/// snackbars are themed here rather than at 300 call sites, so choosing
+/// "Wedding" recolours the studio in one place.
+ThemeData studioTheme({OccasionTheme? occasion}) {
+  final base = _baseTheme();
+  return occasion == null ? base : _occasionise(base, occasion);
+}
+
+ThemeData _occasionise(ThemeData base, OccasionTheme o) {
+  final scheme = base.colorScheme;
+  return base.copyWith(
+    scaffoldBackgroundColor: o.canvas,
+    colorScheme: scheme.copyWith(
+      primary: o.accent,
+      onPrimary: o.accentOn,
+      primaryContainer: o.accentSoft,
+      onPrimaryContainer: o.ink,
+      secondary: o.meta,
+      onSecondary: o.accentOn,
+      surface: o.surface,
+      onSurface: o.ink,
+      surfaceContainerHighest: o.wash,
+      outline: o.border,
+      error: StudioColors.danger,
+    ),
+    dividerColor: o.border,
+    dividerTheme: DividerThemeData(
+      color: o.border,
+      thickness: 1,
+      space: 1,
+    ),
+    inputDecorationTheme: base.inputDecorationTheme.copyWith(
+      fillColor: o.surface,
+      enabledBorder: OutlineInputBorder(
+        borderRadius: StudioShape.smRadius,
+        borderSide: BorderSide(color: o.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: StudioShape.smRadius,
+        borderSide: BorderSide(color: o.accent, width: 1.4),
+      ),
+      hintStyle: TextStyle(color: o.muted, fontSize: 12),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: base.filledButtonTheme.style?.copyWith(
+        backgroundColor: WidgetStatePropertyAll(o.accent),
+        foregroundColor: WidgetStatePropertyAll(o.accentOn),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: base.outlinedButtonTheme.style?.copyWith(
+        foregroundColor: WidgetStatePropertyAll(o.ink),
+        backgroundColor: WidgetStatePropertyAll(o.surface),
+        side: WidgetStatePropertyAll(BorderSide(color: o.border)),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: base.textButtonTheme.style?.copyWith(
+        foregroundColor: WidgetStatePropertyAll(o.accent),
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(foregroundColor: o.ink, iconSize: 19),
+    ),
+    sliderTheme: base.sliderTheme.copyWith(
+      activeTrackColor: o.accent,
+      thumbColor: o.accent,
+      inactiveTrackColor: o.borderSoft,
+      overlayColor: o.accent.withValues(alpha: .12),
+    ),
+    dialogTheme: base.dialogTheme.copyWith(
+      backgroundColor: o.surface,
+      shape: const RoundedRectangleBorder(borderRadius: StudioShape.lgRadius),
+    ),
+    bottomSheetTheme: base.bottomSheetTheme.copyWith(
+      backgroundColor: o.surface,
+      modalBackgroundColor: o.surface,
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: o.ink,
+      contentTextStyle: TextStyle(color: o.surface),
+    ),
+    chipTheme: base.chipTheme.copyWith(
+      backgroundColor: o.wash,
+      selectedColor: o.accentSoft,
+      side: BorderSide(color: o.border),
+      labelStyle: TextStyle(color: o.ink, fontSize: StudioType.xs),
+      secondaryLabelStyle: TextStyle(color: o.accent, fontSize: StudioType.xs),
+    ),
+    progressIndicatorTheme: base.progressIndicatorTheme.copyWith(
+      color: o.accent,
+      linearTrackColor: o.borderSoft,
+    ),
+    switchTheme: base.switchTheme.copyWith(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? o.accentOn
+            : o.surface,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? o.accent
+            : o.borderSoft,
+      ),
+    ),
+    tabBarTheme: base.tabBarTheme.copyWith(
+      labelColor: o.accent,
+      unselectedLabelColor: o.muted,
+      indicatorColor: o.accent,
+    ),
+    tooltipTheme: base.tooltipTheme.copyWith(
+      decoration: BoxDecoration(
+        color: o.ink,
+        borderRadius: StudioShape.smRadius,
+      ),
+      textStyle: TextStyle(color: o.surface, fontSize: StudioType.xs),
+    ),
+  );
+}
+
+ThemeData _baseTheme() => ThemeData(
   useMaterial3: true,
   fontFamily: StudioType.body,
   scaffoldBackgroundColor: StudioColors.canvas,

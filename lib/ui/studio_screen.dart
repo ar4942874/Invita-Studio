@@ -8,12 +8,18 @@ import 'package:flutter/services.dart';
 
 import '../application/app_settings.dart';
 import '../application/studio_controller.dart';
+import '../domain/invitation_template.dart';
 import '../domain/project.dart';
 import '../domain/video/timeline.dart' show MotionPreset;
 import '../l10n/app_localizations.dart';
 import '../services/file_actions.dart';
 import 'event_settings_sheet.dart';
+import 'guide/guide_controller.dart';
+import 'guide/guide_scope.dart';
+import 'guide/guide_spotlight.dart';
+import 'guide/guide_stop.dart';
 import 'invite_actions_sheet.dart';
+import 'occasion_theme.dart';
 import 'project_actions.dart';
 import 'studio_theme.dart';
 import 'widgets/artboard.dart';
@@ -26,8 +32,20 @@ import 'video/video_settings_sheet.dart';
 import 'video/video_workspace.dart';
 
 class StudioScreen extends StatefulWidget {
-  const StudioScreen({super.key, required this.studio});
+  const StudioScreen({
+    super.key,
+    required this.studio,
+    this.startGuide = false,
+  });
   final StudioController studio;
+
+  /// Opens the guided setup as soon as the editor appears.
+  ///
+  /// The wizard sets this when a card has just been created — that is the
+  /// moment the tour is useful. Opening an existing draft never sets it, so
+  /// returning to your own work is never interrupted by a tutorial; the tour
+  /// stays available from the ••• menu.
+  final bool startGuide;
   @override
   State<StudioScreen> createState() => _StudioScreenState();
 }
@@ -37,15 +55,41 @@ class _StudioScreenState extends State<StudioScreen>
   int _tab = 0;
   bool _videoMode = false;
   StudioController get studio => widget.studio;
+
+  /// The room this invitation sits in: one palette per celebration, used by the
+  /// chrome here, by every Material control through `studioTheme(occasion:)`,
+  /// and by the guide's spotlight.
+  OccasionTheme get _occasion =>
+      OccasionTheme.forCategory(studio.project.category);
+
+  final GuideController _guide = GuideController();
+
+  /// One built `ThemeData` per celebration. The studio notifies on every
+  /// keystroke and drag, so rebuilding twenty sub-themes each time would be a
+  /// real cost; the palette only changes when the category does.
+  final Map<InvitationCategory, ThemeData> _themes = {};
+  ThemeData _themeFor(OccasionTheme occasion) => _themes.putIfAbsent(
+    occasion.category,
+    () => studioTheme(occasion: occasion),
+  );
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_openGuide());
+  }
+
+  Future<void> _openGuide() async {
+    await _guide.restore();
+    if (!mounted || !widget.startGuide) return;
+    _guide.startIfNew();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _guide.dispose();
     super.dispose();
   }
 
@@ -127,7 +171,7 @@ class _StudioScreenState extends State<StudioScreen>
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: StudioColors.surface,
+      backgroundColor: occasionFor(context).surface,
       showDragHandle: true,
       useSafeArea: true,
       builder: (context) => FractionallySizedBox(
@@ -516,7 +560,7 @@ class _StudioScreenState extends State<StudioScreen>
   Widget _saveStatus({bool compact = false}) {
     final failed = studio.saveState == SaveState.failed;
     final saving = studio.saveState == SaveState.saving;
-    final color = failed ? StudioColors.warning : StudioColors.accent;
+    final color = failed ? StudioColors.warning : _occasion.accent;
     return Tooltip(
       message:
           studio.storageError ??
@@ -546,7 +590,7 @@ class _StudioScreenState extends State<StudioScreen>
                     : 'All changes saved',
                 style: TextStyle(
                   fontSize: 10,
-                  color: failed ? color : StudioColors.muted,
+                  color: failed ? color : _occasion.muted,
                 ),
               ),
             ],
@@ -558,12 +602,13 @@ class _StudioScreenState extends State<StudioScreen>
 
   Widget _header(double width) {
     final mobile = width < 850;
+    final occasion = _occasion;
     return Container(
       height: mobile ? 66 : 76,
       padding: EdgeInsets.symmetric(horizontal: mobile ? 16 : 27),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: StudioColors.border)),
+      decoration: BoxDecoration(
+        color: occasion.surface,
+        border: Border(bottom: BorderSide(color: occasion.border)),
       ),
       child: Row(
         children: [
@@ -588,7 +633,7 @@ class _StudioScreenState extends State<StudioScreen>
             Container(
               width: 1,
               height: 28,
-              color: StudioColors.border,
+              color: occasion.border,
               margin: const EdgeInsets.symmetric(horizontal: 25),
             ),
             ConstrainedBox(
@@ -611,10 +656,10 @@ class _StudioScreenState extends State<StudioScreen>
                       ),
                     ),
                     const SizedBox(width: 7),
-                    const Icon(
+                    Icon(
                       Icons.edit_outlined,
                       size: 12,
-                      color: StudioColors.muted,
+                      color: occasion.muted,
                     ),
                   ],
                 ),
@@ -624,9 +669,13 @@ class _StudioScreenState extends State<StudioScreen>
           ],
           const Spacer(),
           if (!mobile) ...[
-            _ModeSwitch(
-              videoMode: _videoMode,
-              onChanged: _setVideoMode,
+            GuideTarget(
+              anchor: GuideAnchors.motion,
+              radius: 10,
+              child: _ModeSwitch(
+                videoMode: _videoMode,
+                onChanged: _setVideoMode,
+              ),
             ),
             const SizedBox(width: 14),
           ],
@@ -644,7 +693,10 @@ class _StudioScreenState extends State<StudioScreen>
               icon: const Icon(Icons.folder_open_outlined, size: 17),
               label: const Text('My drafts'),
             ),
-          PopupMenuButton<String>(
+          GuideTarget(
+            anchor: GuideAnchors.invite,
+            radius: 10,
+            child: PopupMenuButton<String>(
             tooltip: 'Project options',
             icon: const Icon(Icons.more_horiz, size: 21),
             onSelected: (value) {
@@ -673,6 +725,8 @@ class _StudioScreenState extends State<StudioScreen>
                   _about();
                 case 'reset':
                   _reset();
+                case 'guide':
+                  _startOrStopGuide();
               }
             },
             itemBuilder: (menuContext) {
@@ -711,6 +765,13 @@ class _StudioScreenState extends State<StudioScreen>
                   child: Text('Rename invitation'),
                 ),
                 const PopupMenuItem(value: 'reset', child: Text('Reset layout')),
+                PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'guide',
+                  child: Text(
+                    _guide.isVisible ? 'Exit guided setup' : 'Guided setup',
+                  ),
+                ),
                 const PopupMenuDivider(),
                 PopupMenuItem(value: 'language', child: Text(l10n.language)),
                 const PopupMenuDivider(),
@@ -720,9 +781,13 @@ class _StudioScreenState extends State<StudioScreen>
                 ),
               ];
             },
+            ),
           ),
           SizedBox(width: mobile ? 4 : 12),
-          FilledButton.icon(
+          GuideTarget(
+            anchor: GuideAnchors.export,
+            radius: 12,
+            child: FilledButton.icon(
             onPressed: _export,
             style: FilledButton.styleFrom(
               padding: EdgeInsets.symmetric(
@@ -730,24 +795,148 @@ class _StudioScreenState extends State<StudioScreen>
                 vertical: mobile ? 14 : 18,
               ),
             ),
-            icon: const Icon(Icons.file_download_outlined, size: 17),
-            label: Text(mobile ? 'Export' : 'Export invitation'),
+              icon: const Icon(Icons.file_download_outlined, size: 17),
+              label: Text(mobile ? 'Export' : 'Export invitation'),
+            ),
           ),
         ],
       ),
     );
   }
 
+  /// One tab in the phone's bottom bar. The first three are tour targets; the
+  /// style tab is not a step of its own.
+  Widget _mobileTab(int index) {
+    final occasion = _occasion;
+    final tab = InkWell(
+      onTap: () => _showPanel(index),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            [
+              Icons.edit_note,
+              Icons.grid_view_outlined,
+              Icons.layers_outlined,
+              Icons.format_color_text,
+            ][index],
+            size: 20,
+            color: occasion.accent,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            ['Details', 'Templates', 'Layers', 'Style'][index],
+            style: TextStyle(fontSize: 10, color: occasion.ink),
+          ),
+        ],
+      ),
+    );
+    if (index > 2) return tab;
+    return GuideTarget(
+      anchor: [
+        GuideAnchors.details,
+        GuideAnchors.composition,
+        GuideAnchors.layers,
+      ][index],
+      radius: 10,
+      child: tab,
+    );
+  }
+
+  /// The tour's switch: opens at the first unfinished step, closes if open, and
+  /// asks to be brought back if it was switched off.
+  void _startOrStopGuide() {
+    if (_guide.isVisible) {
+      _guide.dismiss();
+      return;
+    }
+    if (_guide.isOff) {
+      _guide.turnOn();
+      return;
+    }
+    _guide.start();
+  }
+
+  /// The thin progress strip under the header. Only there while the tour is
+  /// open, so the editor stays quiet once it is finished or put away.
+  Widget _guideStrip() => AnimatedBuilder(
+    animation: _guide,
+    builder: (context, _) {
+      if (!_guide.isVisible) return const SizedBox.shrink();
+      final occasion = _occasion;
+      final stop = _guide.current;
+      return Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: occasion.wash,
+          border: Border(bottom: BorderSide(color: occasion.borderSoft)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome_outlined, size: 13, color: occasion.accent),
+            const SizedBox(width: 7),
+            Text(
+              'Guided setup · ${_guide.position} of ${_guide.total}',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: occasion.accent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: _guide.position / _guide.total,
+                  minHeight: 3,
+                  backgroundColor: occasion.borderSoft,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                stop?.title ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10.5, color: occasion.muted),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Exit guided setup',
+              visualDensity: VisualDensity.compact,
+              onPressed: _guide.dismiss,
+              icon: Icon(Icons.close, size: 15, color: occasion.muted),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: studio,
-    builder: (context, _) => LayoutBuilder(
-      builder: (context, constraints) {
+    builder: (context, _) {
+      final occasion = _occasion;
+      return OccasionScope(
+        theme: occasion,
+        child: Theme(
+          data: _themeFor(occasion),
+          child: GuideScope(
+            notifier: _guide,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
         final width = constraints.maxWidth,
             mobile = width < 850,
             inspector = width >= 1220;
-        return CallbackShortcuts(
-          bindings: {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            CallbackShortcuts(
+              bindings: {
             const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
                 studio.undo,
             const SingleActivator(LogicalKeyboardKey.keyZ, meta: true):
@@ -772,17 +961,22 @@ class _StudioScreenState extends State<StudioScreen>
                 child: Column(
                   children: [
                     _header(width),
+                    _guideStrip(),
                     if (mobile)
                       Container(
                         height: 51,
                         padding: const EdgeInsets.symmetric(horizontal: 18),
-                        color: StudioColors.wash,
+                        color: _occasion.wash,
                         child: Row(
                           children: [
-                            _ModeSwitch(
-                              videoMode: _videoMode,
-                              onChanged: _setVideoMode,
-                              compact: true,
+                            GuideTarget(
+                              anchor: GuideAnchors.motion,
+                              radius: 10,
+                              child: _ModeSwitch(
+                                videoMode: _videoMode,
+                                onChanged: _setVideoMode,
+                                compact: true,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -799,10 +993,10 @@ class _StudioScreenState extends State<StudioScreen>
                                 ),
                               ),
                             ),
-                            const Icon(
+                            Icon(
                               Icons.edit_outlined,
                               size: 12,
-                              color: StudioColors.muted,
+                              color: _occasion.muted,
                             ),
                           ],
                         ),
@@ -820,10 +1014,10 @@ class _StudioScreenState extends State<StudioScreen>
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 14,
                                     ),
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       border: Border(
                                         bottom: BorderSide(
-                                          color: StudioColors.border,
+                                          color: occasion.border,
                                         ),
                                       ),
                                     ),
@@ -831,20 +1025,28 @@ class _StudioScreenState extends State<StudioScreen>
                                       children: [
                                         for (var i = 0; i < 3; i++)
                                           Expanded(
-                                            child: _SideTab(
-                                              label: [
-                                                'Details',
-                                                'Templates',
-                                                'Layers',
+                                            child: GuideTarget(
+                                              anchor: [
+                                                GuideAnchors.details,
+                                                GuideAnchors.composition,
+                                                GuideAnchors.layers,
                                               ][i],
-                                              icon: [
-                                                Icons.tune,
-                                                Icons.grid_view_outlined,
-                                                Icons.layers_outlined,
-                                              ][i],
-                                              selected: _tab == i,
-                                              onTap: () =>
-                                                  setState(() => _tab = i),
+                                              radius: 8,
+                                              child: _SideTab(
+                                                label: [
+                                                  'Details',
+                                                  'Templates',
+                                                  'Layers',
+                                                ][i],
+                                                icon: [
+                                                  Icons.tune,
+                                                  Icons.grid_view_outlined,
+                                                  Icons.layers_outlined,
+                                                ][i],
+                                                selected: _tab == i,
+                                                onTap: () =>
+                                                    setState(() => _tab = i),
+                                              ),
                                             ),
                                           ),
                                       ],
@@ -918,58 +1120,37 @@ class _StudioScreenState extends State<StudioScreen>
                   ? SafeArea(
                       child: Container(
                         height: 66,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
+                        decoration: BoxDecoration(
+                          color: _occasion.surface,
                           border: Border(
-                            top: BorderSide(color: StudioColors.border),
+                            top: BorderSide(color: _occasion.border),
                           ),
                         ),
                         child: Row(
                           children: [
                             for (var i = 0; i < 4; i++)
                               Expanded(
-                                child: InkWell(
-                                  onTap: () => _showPanel(i),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        [
-                                          Icons.edit_note,
-                                          Icons.grid_view_outlined,
-                                          Icons.layers_outlined,
-                                          Icons.format_color_text,
-                                        ][i],
-                                        size: 20,
-                                        color: StudioColors.accent,
-                                      ),
-                                      const SizedBox(height: 5),
-                                      Text(
-                                        [
-                                          'Details',
-                                          'Templates',
-                                          'Layers',
-                                          'Style',
-                                        ][i],
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: StudioColors.ink,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                child: _mobileTab(i),
                               ),
                           ],
                         ),
                       ),
                     )
                   : null,
+                ),
+              ),
+            ),
+            // The tour floats above the whole screen, header included, so it
+            // can point at Export without reparenting anything.
+            Positioned.fill(child: GuideSpotlight(controller: _guide)),
+          ],
+        );
+              },
             ),
           ),
-        );
-      },
-    ),
+        ),
+      );
+    },
   );
 }
 
@@ -985,80 +1166,89 @@ class _ModeSwitch extends StatelessWidget {
   final bool compact;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(2),
-    decoration: BoxDecoration(
-      color: StudioColors.wash,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: StudioColors.border),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _segment(
-          label: 'Image',
-          icon: Icons.image_outlined,
-          selected: !videoMode,
-          onTap: () => onChanged(false),
-        ),
-        _segment(
-          label: 'Video',
-          icon: Icons.play_circle_outline,
-          selected: videoMode,
-          onTap: () => onChanged(true),
-        ),
-      ],
-    ),
-  );
-
-  Widget _segment({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(6),
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 7 : 9,
-        vertical: compact ? 4 : 5,
-      ),
+  Widget build(BuildContext context) {
+    final occasion = occasionFor(context);
+    return Container(
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: selected ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-        boxShadow: selected
-            ? const [
-                BoxShadow(
-                  color: Color(0x14000000),
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
-                ),
-              ]
-            : null,
+        color: occasion.wash,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: occasion.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 13,
-            color: selected ? StudioColors.accent : StudioColors.muted,
+          _segment(
+            context,
+            label: 'Image',
+            icon: Icons.image_outlined,
+            selected: !videoMode,
+            onTap: () => onChanged(false),
           ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              color: selected ? StudioColors.ink : StudioColors.muted,
-            ),
+          _segment(
+            context,
+            label: 'Video',
+            icon: Icons.play_circle_outline,
+            selected: videoMode,
+            onTap: () => onChanged(true),
           ),
         ],
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _segment(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final occasion = occasionFor(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 7 : 9,
+          vertical: compact ? 4 : 5,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? occasion.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: selected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x14000000),
+                    blurRadius: 4,
+                    offset: Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: selected ? occasion.accent : occasion.muted,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: selected ? occasion.ink : occasion.muted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SideTab extends StatelessWidget {
@@ -1072,36 +1262,40 @@ class _SideTab extends StatelessWidget {
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(6),
-    child: Container(
-      height: 33,
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: selected ? StudioColors.accentSoft : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 13,
-            color: selected ? StudioColors.accent : StudioColors.muted,
-          ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              color: selected ? StudioColors.accent : StudioColors.muted,
+  Widget build(BuildContext context) {
+    final occasion = occasionFor(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        height: 33,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: selected ? occasion.accentSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: selected ? occasion.accent : occasion.muted,
             ),
-          ),
-        ],
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected ? occasion.accent : occasion.muted,
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

@@ -168,6 +168,19 @@ async function routeLocal(context) {
   });
 }
 
+/** Closes the guided setup if it opened.
+ *
+ * A card created by the wizard opens the tour; the rest of this run drives the
+ * editor itself, so the spotlight has to go. Returns whether it was showing.
+ */
+async function dismissTour(page) {
+  const close = page.getByRole('button', { name: 'Close the guided setup' });
+  if ((await close.count()) === 0) return false;
+  await close.first().click({ force: true });
+  await frame(page);
+  return true;
+}
+
 /** Guided start: category -> details -> card -> studio. */
 async function enterStudio(
   page,
@@ -191,6 +204,7 @@ async function enterStudio(
   await frame(page);
   await button(page, 'Create invitation');
   await page.getByRole('button', { name: /^(Export invitation|Export)$/ }).waitFor();
+  await dismissTour(page);
 }
 
 (async () => {

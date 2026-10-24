@@ -35,6 +35,8 @@
 | Tune-length and export-preflight tests (`test/category_music_test.dart`, `test/export_preflight_test.dart`, `test/video_export_dialog_test.dart`) | **Pass** — WAV headers match the generated map; the export dialog resolves a bundled tune and blocks on a missing clip |
 | `flutter analyze`, `flutter test`, `flutter build web --release` | **Pass** — analyzer clean, full suite green, web release builds |
 | Android encoder, iOS encoder, share sheet, device playback | **Not executed** — no JDK/Android SDK/Xcode/device |
+| Occasion themes, focus lights, guided setup (Dart suite) | **Source + widget tests only** — `test/occasion_theme_test.dart`, `test/focus_light_test.dart` and `test/guide_test.dart`; no Flutter SDK in this sandbox, so CI is the first real run |
+| Browser smoke re-run after the theme/light/guide work | **Not run in this environment** — `tool/browser/smoke.cjs` now closes the tour that opens on a wizard-created card, but no web build or browser run was made in this environment |
 
 The sample MP4s are produced by `tool/reference_sample.py`, a development-only
 renderer that reproduces the app's bundled artwork, fonts, layout constants and
@@ -48,7 +50,7 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 | Dependency resolution with `pubspec.lock` | Passed |
 | `flutter analyze` | **No issues found** |
 | `flutter test --concurrency=1 test packages/flutter_canvas_editor/test` | **64 passed** (image-editor baseline) |
-| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 22 test files pass** |
+| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 25 test files pass** |
 | `flutter build web --release --no-web-resources-cdn --no-wasm-dry-run -O1` | **Built successfully** |
 | Real compiled-app browser workflow checks | **12 passed** |
 | Real compiled-app photo-card browser checks | **7 passed** |
@@ -83,6 +85,9 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 - Compositions: all three arrangements produce the same ten linked layers in order, inside the page, with no layer painting over the one below it, across all three formats and with deliberately long names; the centred arrangement still matches the shipped geometry; every design carries its own composition; and the studio detects the applied composition, keeps it through a format change and a reopen, restores it on undo, and reports "unknown" rather than guessing after the layers are moved.
 - Catalogue scale: only the visible rows are built, page two is absent from the tree until "Show more" is pressed, the remaining count is exact, and design thumbnails decode at tile width instead of source size. Previews decode at thumbnail size by default, keep their layout at any decode width, and every bundled background resolves back to its own design.
 - The details panel shows the structured calendar line once a date is picked, and the event sheet applies a category change from the UI.
+- Occasion themes: every celebration has its own palette, every text pairing is computed to clear 4.5:1 (cream-on-sage, blush, coral, gold, sky and terracotta are measured in the test rather than eyeballed), and `studioTheme(occasion:)` repaints buttons, inputs, sliders, tab bars, dialogs and snackbars in that palette while the neutral theme is unchanged.
+- Guided setup: the tour opens on a freshly created card, finishing / skipping / dismissing are separate states (skip does not mark a step done, dismiss resumes at the same step), a step whose control is not on the current screen is stepped over, and the spotlight leaves the highlighted control tappable instead of swallowing the tap.
+- Focus lights: a light is a persisted project setting painted by one function in the artboard, the thumbnails, the video frames and the exported PNG; unknown or missing lights open as no light, intensity is clamped, and zero strength is identical to off.
 - Responsive widget layouts at **320, 390, 850, 1024 and 1440 pixels**, including mobile sheets/export setup.
 - Actual canvas drag/inline-edit gestures and undo, not only controller method calls.
 - Four retained upstream test files covering color, document JSON, hit testing, coordinates and history.

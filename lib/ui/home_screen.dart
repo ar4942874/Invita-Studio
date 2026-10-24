@@ -7,6 +7,7 @@ import '../domain/project.dart';
 import '../domain/relative_time.dart';
 import '../l10n/app_localizations.dart';
 import 'home_theme.dart';
+import 'occasion_theme.dart';
 import 'project_actions.dart';
 import 'studio_screen.dart';
 import 'widgets/controls.dart';
@@ -38,9 +39,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   StudioController get _studio => widget.studio;
 
+  /// The room this celebration opens in. Before a category is chosen the
+  /// wizard shows the neutral warm palette rather than guessing.
+  OccasionTheme get _occasion => OccasionTheme.forCategory(
+    _category ?? InvitationCategory.other,
+  );
+
   /// The home shell runs on the OpenDesign `elegant` package; see
-  /// `home_theme.dart`. Memoized because `ThemeData` is rebuilt every frame.
-  late final _elegant = elegantHomeTheme();
+  /// `home_theme.dart`. Derived from the chosen occasion and cached per
+  /// category, because `ThemeData` is rebuilt every frame otherwise.
+  final Map<InvitationCategory, ThemeData> _themes = {};
+  ThemeData get _elegant => _themes.putIfAbsent(
+    _occasion.category,
+    () => elegantHomeTheme(occasion: _occasion),
+  );
 
   AppLocalizations get _l10n => AppLocalizations.of(context);
 
@@ -78,9 +90,12 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _step -= 1);
   }
 
-  Future<void> _openStudio() async {
+  Future<void> _openStudio({bool startGuide = false}) async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => StudioScreen(studio: _studio)),
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            StudioScreen(studio: _studio, startGuide: startGuide),
+      ),
     );
   }
 
@@ -113,17 +128,20 @@ class _HomeScreenState extends State<HomeScreen> {
       _toast(error.message);
       return;
     }
-    if (mounted) await _openStudio();
+    // A brand-new card gets the tour; a draft the host opens does not.
+    if (mounted) await _openStudio(startGuide: true);
   }
 
   @override
-  Widget build(BuildContext context) => Theme(
-    data: _elegant,
-    child: Builder(
-      builder: (context) => Scaffold(
-        backgroundColor: HomeColors.canvas,
-        body: DecoratedBox(
-          decoration: const BoxDecoration(gradient: homePageGradient),
+  Widget build(BuildContext context) => OccasionScope(
+    theme: _occasion,
+    child: Theme(
+      data: _elegant,
+      child: Builder(
+        builder: (context) => Scaffold(
+          backgroundColor: _occasion.canvas,
+          body: DecoratedBox(
+            decoration: BoxDecoration(gradient: _occasion.pageGradient),
           child: SafeArea(
             child: Column(
               children: [
@@ -153,13 +171,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     ),
+    ),
   );
 
   Widget _topBar() => Container(
     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-    decoration: const BoxDecoration(
-      color: HomeColors.surface,
-      border: Border(bottom: BorderSide(color: HomeColors.borderSoft)),
+    decoration: BoxDecoration(
+      color: _occasion.surface,
+      border: Border(bottom: BorderSide(color: _occasion.borderSoft)),
     ),
     child: Row(
       children: [
@@ -202,10 +221,10 @@ class _HomeScreenState extends State<HomeScreen> {
           height: 8,
           decoration: BoxDecoration(
             color: i == _step
-                ? HomeColors.accent
+                ? _occasion.accent
                 : i < _step
-                ? HomeColors.surfaceWarm
-                : HomeColors.borderSoft,
+                ? _occasion.surfaceWarm
+                : _occasion.borderSoft,
             borderRadius: const BorderRadius.all(Radius.circular(4)),
           ),
         ),
@@ -228,16 +247,16 @@ class _HomeScreenState extends State<HomeScreen> {
     height: 1.02,
     fontWeight: FontWeight.w600,
     letterSpacing: -_heroSize * .025,
-    color: HomeColors.ink,
+    color: _occasion.ink,
   );
 
   Widget _eyebrow(String text) => Text(
     text.toUpperCase(),
-    style: const TextStyle(
+    style: TextStyle(
       fontSize: 10.5,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.8,
-      color: HomeColors.meta,
+      color: _occasion.meta,
     ),
   );
 
@@ -315,9 +334,9 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.only(top: 2),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: HomeColors.surface,
+          color: _occasion.surface,
           borderRadius: HomeShape.lgRadius,
-          border: Border.all(color: HomeColors.borderSoft),
+          border: Border.all(color: _occasion.borderSoft),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,14 +347,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 40,
                   height: 40,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: HomeColors.accentSoft,
+                  decoration: BoxDecoration(
+                    color: _occasion.accentSoft,
                     borderRadius: HomeShape.smRadius,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.edit_note_outlined,
                     size: 21,
-                    color: HomeColors.accent,
+                    color: _occasion.accent,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -357,9 +376,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 14),
-            const Divider(height: 1, color: HomeColors.borderSoft),
+            Divider(height: 1, color: _occasion.borderSoft),
             const SizedBox(height: 8),
-            TinyLabel(_l10n.recentInvitations, color: HomeColors.meta),
+            TinyLabel(_l10n.recentInvitations, color: _occasion.meta),
             const SizedBox(height: 4),
             for (final draft in drafts.take(4))
               _DraftRow(
@@ -492,7 +511,7 @@ class _HomeScreenState extends State<HomeScreen> {
     padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
     child: Column(
       children: [
-        const Divider(height: 1, color: HomeColors.borderSoft),
+        Divider(height: 1, color: _occasion.borderSoft),
         const SizedBox(height: 24),
         Row(
           children: [
@@ -530,6 +549,7 @@ class _CategoryTileState extends State<_CategoryTile> {
 
   @override
   Widget build(BuildContext context) {
+    final o = occasionFor(context);
     final category = widget.category;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -538,15 +558,15 @@ class _CategoryTileState extends State<_CategoryTile> {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
-          color: HomeColors.surface,
+          color: o.surface,
           borderRadius: HomeShape.lgRadius,
           border: Border.all(
-            color: _hovered ? HomeColors.border : HomeColors.borderSoft,
+            color: _hovered ? o.border : o.borderSoft,
           ),
           boxShadow: _hovered
               ? [
                   BoxShadow(
-                    color: HomeColors.ink.withValues(alpha: .07),
+                    color: o.ink.withValues(alpha: .07),
                     blurRadius: 28,
                     offset: const Offset(0, 10),
                   ),
@@ -568,10 +588,10 @@ class _CategoryTileState extends State<_CategoryTile> {
                     height: 56,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [HomeColors.surfaceWarm, HomeColors.accentSoft],
+                        colors: [o.surfaceWarm, o.accentSoft],
                       ),
                       borderRadius: const BorderRadius.all(
                         Radius.circular(14),
@@ -580,7 +600,7 @@ class _CategoryTileState extends State<_CategoryTile> {
                     child: Icon(
                       category.icon,
                       size: 25,
-                      color: HomeColors.accent,
+                      color: o.accent,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -590,13 +610,13 @@ class _CategoryTileState extends State<_CategoryTile> {
                       children: [
                         Text(
                           category.label,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'CormorantGaramond',
                             fontSize: 21,
                             height: 1.1,
                             fontWeight: FontWeight.w600,
                             letterSpacing: -.2,
-                            color: HomeColors.ink,
+                            color: o.ink,
                           ),
                         ),
                         const SizedBox(height: 5),
@@ -604,10 +624,10 @@ class _CategoryTileState extends State<_CategoryTile> {
                           category.tagline,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12.5,
                             height: 1.45,
-                            color: HomeColors.muted,
+                            color: o.muted,
                           ),
                         ),
                       ],
@@ -618,14 +638,14 @@ class _CategoryTileState extends State<_CategoryTile> {
                     width: 30,
                     height: 30,
                     alignment: Alignment.center,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: HomeColors.wash,
+                      color: o.wash,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.arrow_forward,
                       size: 14,
-                      color: HomeColors.accent,
+                      color: o.accent,
                     ),
                   ),
                 ],
@@ -653,6 +673,7 @@ class _CardTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final o = occasionFor(context);
     final document = template.createDocument(
       documentId: 'home_preview',
       format: InvitationFormat.classic,
@@ -670,11 +691,11 @@ class _CardTile extends StatelessWidget {
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
           color: selected
-              ? HomeColors.accentSoft.withValues(alpha: .45)
-              : HomeColors.surface,
+              ? o.accentSoft.withValues(alpha: .45)
+              : o.surface,
           borderRadius: HomeShape.lgRadius,
           border: Border.all(
-            color: selected ? HomeColors.accent : HomeColors.borderSoft,
+            color: selected ? o.accent : o.borderSoft,
             width: selected ? 1.6 : 1,
           ),
         ),
@@ -714,20 +735,20 @@ class _CardTile extends StatelessWidget {
                         ),
                       ),
                       if (selected)
-                        const Icon(
+                        Icon(
                           Icons.check_circle,
                           size: 18,
-                          color: HomeColors.accent,
+                          color: o.accent,
                         ),
                     ],
                   ),
                   const SizedBox(height: 5),
                   Text(
                     template.caption,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       height: 1.45,
-                      color: HomeColors.muted,
+                      color: o.muted,
                     ),
                   ),
                 ],
@@ -761,6 +782,7 @@ class _DraftRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final o = occasionFor(context);
     final locale = Localizations.localeOf(context).languageCode;
     final relative = relativeTimeLabel(draft.updatedAt);
     final stamp =
@@ -792,18 +814,18 @@ class _DraftRow extends StatelessWidget {
                       '${draft.category.label} · edited $stamp',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10.5,
-                        color: HomeColors.muted,
+                        color: o.muted,
                       ),
                     ),
                   ],
                 ),
               ),
               if (active)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(right: 4),
-                  child: TinyLabel('Editing', color: HomeColors.meta),
+                  child: TinyLabel('Editing', color: o.meta),
                 ),
               PopupMenuButton<String>(
                 tooltip: 'Draft options',

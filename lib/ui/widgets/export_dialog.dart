@@ -223,6 +223,7 @@ class _ExportDialogState extends State<ExportDialog> {
                             ? DocumentPreview(
                                 document: studio.document,
                                 decodeWidth: 240,
+                                focusLight: studio.project.focusLight,
                               )
                             : Image.memory(_file!.bytes, fit: BoxFit.contain),
                       ),

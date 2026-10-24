@@ -216,6 +216,7 @@ class _VideoExportDialogState extends State<VideoExportDialog> {
           audio: audio,
           imageProvider: widget.studio.editor.imageProvider,
           outputWidth: _quality.width,
+          focusLight: widget.studio.project.focusLight,
         ),
         onProgress: (value) {
           if (!mounted) return;

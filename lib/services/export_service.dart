@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'focus_light_export.dart';
 import 'jpeg_encoder.dart';
 
 import '../application/studio_controller.dart';
@@ -42,7 +43,11 @@ class ExportService {
       pixelRatio: scale.toDouble(),
       document: fitTextDocument(doc),
     );
-    final bytes = format == ImageFormat.png ? png : await encodeJpeg(png);
+    // The engine renders the document, not the card's light, so the light is
+    // painted onto the finished pixels here — the same painter the artboard
+    // and the video renderer use.
+    final lit = await applyFocusLightToPng(png, studio.focusLight);
+    final bytes = format == ImageFormat.png ? lit : await encodeJpeg(lit);
     final slug = title
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')

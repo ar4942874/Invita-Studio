@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
+import '../../domain/focus_light.dart';
 import '../../domain/invitation_template.dart';
 import '../../domain/video/timeline.dart';
 import 'video_media.dart';
@@ -123,10 +124,15 @@ class TimelineFrameRenderer {
   TimelineFrameRenderer({
     required DesignDocument document,
     required this.imageCache,
+    this.focusLight = FocusLightSetting.none,
   }) : document = fitTextDocument(document);
 
   final DesignDocument document;
   final Map<String, ui.Image> imageCache;
+
+  /// The card's light. Painted from the same function as the artboard and the
+  /// still export, so a video keeps the light the host chose.
+  final FocusLightSetting focusLight;
 
   static const Set<String> _nonLayerTypes = {'background'};
 
@@ -226,14 +232,19 @@ class TimelineFrameRenderer {
       nodes.add(_withVisual(layer, visual));
       opacities[node.id] = visual.opacity;
     }
-    if (nodes.isEmpty) return;
-    CanvasPainter(
-      document: document.copyWith(nodes: nodes),
-      coords: coords,
-      imageCache: imageCache,
-      devicePixelRatio: 1,
-      nodeOpacities: opacities,
-    ).paint(canvas, size);
+    if (nodes.isNotEmpty) {
+      CanvasPainter(
+        document: document.copyWith(nodes: nodes),
+        coords: coords,
+        imageCache: imageCache,
+        devicePixelRatio: 1,
+        nodeOpacities: opacities,
+      ).paint(canvas, size);
+    }
+
+    // 4. The focus light sits on top of the artwork but under nothing else:
+    // it is light falling across the finished card.
+    paintFocusLight(canvas, size, focusLight);
   }
 
   DesignNode _withVisual(DesignNode node, LayerVisual visual) {
