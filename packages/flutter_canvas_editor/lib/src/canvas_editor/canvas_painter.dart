@@ -87,23 +87,35 @@ class CanvasPainter extends CustomPainter {
     if (node is BackgroundNode) {
       _drawBackground(canvas, node, screenRect);
     } else if (node is TextNode && node.id != editingNodeId) {
+      // Lay the text out in document space, then scale the canvas. Laying it
+      // out at screen size rounds glyph advances differently from the
+      // document-space fit (especially on a phone, where the viewport scale is
+      // small), which can wrap one extra line and paint over the next layer.
+      // Matching the fit exactly keeps every line inside its frame.
+      canvas.save();
+      canvas.translate(screenRect.left, screenRect.top);
+      canvas.scale(coords.viewportScale);
+      canvas.clipRect(
+        Rect.fromLTWH(0, 0, node.frame.width, node.frame.height),
+      );
       final textStyle = TextStyle(
         color: _parseHex(node.textColor),
         fontFamily: node.fontFamily,
         fontFamilyFallback: const ['NotoNaskhArabic'],
-        fontSize: node.fontSize * coords.viewportScale,
+        fontSize: node.fontSize,
         fontWeight: _fontWeight(node.fontWeight),
         height: node.lineHeight,
-        letterSpacing: node.letterSpacing * coords.viewportScale,
+        letterSpacing: node.letterSpacing,
       );
       final tp = TextPainter(
         text: TextSpan(text: node.text, style: textStyle),
         textDirection: invitationTextDirection(node.text),
         textAlign: _textAlign(node.textAlign),
       );
-      tp.layout(minWidth: screenRect.width, maxWidth: screenRect.width);
-      tp.paint(canvas, screenRect.topLeft);
+      tp.layout(minWidth: node.frame.width, maxWidth: node.frame.width);
+      tp.paint(canvas, Offset.zero);
       tp.dispose();
+      canvas.restore();
     } else if (node is ImageNode) {
       final ref = CanvasImageReference.fromImageNode(node);
       final cached = ref.cacheKey != null ? imageCache[ref.cacheKey] : null;

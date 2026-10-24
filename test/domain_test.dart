@@ -102,6 +102,44 @@ void main() {
     expect(painter.height, lessThanOrEqualTo(fitted.frame.height + .1));
     painter.dispose();
   });
+  test('long names never paint over the ampersand on any format', () {
+    const fields = {
+      'first': 'Muhammed Abdulrahman Umar',
+      'second': 'Ayesha Noor Fatima Khan',
+    };
+    double paintedHeight(TextNode node) {
+      final painter = TextPainter(
+        text: TextSpan(text: node.text, style: nodeTextStyle(node)),
+        textDirection: invitationTextDirection(node.text),
+      )..layout(maxWidth: node.frame.width);
+      final height = painter.height;
+      painter.dispose();
+      return height;
+    }
+
+    for (final format in InvitationFormat.values) {
+      final doc = invitationTemplates.first.createDocument(
+        documentId: 'overlap',
+        format: format,
+        fields: fields,
+      );
+      TextNode node(String id) =>
+          doc.nodes.whereType<TextNode>().firstWhere((n) => n.id == id);
+      final first = node('first');
+      final amp = node('amp');
+      final second = node('second');
+      expect(
+        first.frame.top + paintedHeight(first),
+        lessThanOrEqualTo(amp.frame.top),
+        reason: '${format.name}: the first name paints over the ampersand',
+      );
+      expect(
+        amp.frame.top + paintedHeight(amp),
+        lessThanOrEqualTo(second.frame.top),
+        reason: '${format.name}: the ampersand paints over the second name',
+      );
+    }
+  });
   test(
     'first-strong text direction supports Arabic script and neutral prefixes',
     () {

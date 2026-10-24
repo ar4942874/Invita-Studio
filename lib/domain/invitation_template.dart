@@ -271,10 +271,16 @@ class InvitationTemplate {
     }
 
     text('header', square ? .148 : .202, 50, square ? 19 : 22, spacing: 3.2);
+    // The name frames sit directly above the ampersand. On a phone the wizard
+    // is where the first long name is typed, so the frame must stop before the
+    // next layer: otherwise a name that shrinks to fill its full height paints
+    // over the "&". Keep a small gutter and never grow past the old height.
+    final firstTop = square ? .220 : .268;
+    final ampTop = square ? .330 : .382;
     text(
       'first',
-      square ? .220 : .268,
-      nameSize * 1.2,
+      firstTop,
+      math.min(nameSize * 1.2, (ampTop - firstTop) * h - 2),
       nameSize,
       family: 'CormorantGaramond',
       width: 850,
