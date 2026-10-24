@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'occasion_theme.dart';
 import 'studio_theme.dart';
 
 /// Design tokens adapted from the OpenDesign `elegant` design system, applied
@@ -55,7 +56,9 @@ abstract final class HomeShape {
   static const lgRadius = BorderRadius.all(Radius.circular(lg));
 }
 
-/// The Elegant page treatment: an ivory wash across the landing screen.
+/// The Elegant page treatment with the neutral tokens — an ivory wash across
+/// the landing screen before a category is picked. Once one is, the wash comes
+/// from `OccasionTheme.pageGradient` instead.
 const homePageGradient = LinearGradient(
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
@@ -63,43 +66,54 @@ const homePageGradient = LinearGradient(
   colors: [HomeColors.canvas, HomeColors.surface, HomeColors.surfaceWarm],
 );
 
-/// [studioTheme] with the color, shape and control signals swapped to the
-/// Elegant package so every Material widget the home screen hosts (buttons,
-/// inputs, popups) follows the same package as the bespoke tiles.
-ThemeData elegantHomeTheme() {
-  final base = studioTheme();
+/// [studioTheme] with the shape and control signals swapped to the Elegant
+/// package so every Material widget the home screen hosts (buttons, inputs,
+/// popups) follows the same package as the bespoke tiles.
+///
+/// Pass [occasion] and the colours come from that celebration instead of the
+/// neutral [HomeColors]; the shapes stay here either way. The palette is passed
+/// straight through to [studioTheme] so the two screens never disagree about,
+/// say, what "accent" means.
+ThemeData elegantHomeTheme({OccasionTheme? occasion}) {
+  final base = studioTheme(occasion: occasion);
+
+  final canvas = occasion?.canvas ?? HomeColors.canvas;
+  final surface = occasion?.surface ?? HomeColors.surface;
+  final border = occasion?.border ?? HomeColors.border;
+  final ink = occasion?.ink ?? HomeColors.ink;
+  final accent = occasion?.accent ?? HomeColors.accent;
+  final accentOn = occasion?.accentOn ?? HomeColors.accentOn;
+  final accentSoft = occasion?.accentSoft ?? HomeColors.accentSoft;
+  final danger = StudioColors.danger;
+
   return base.copyWith(
-    scaffoldBackgroundColor: HomeColors.canvas,
+    scaffoldBackgroundColor: canvas,
     colorScheme: base.colorScheme.copyWith(
-      primary: HomeColors.accent,
-      onPrimary: HomeColors.accentOn,
-      primaryContainer: HomeColors.accentSoft,
-      onPrimaryContainer: HomeColors.ink,
-      surface: HomeColors.surface,
-      onSurface: HomeColors.ink,
-      error: HomeColors.danger,
+      primary: accent,
+      onPrimary: accentOn,
+      primaryContainer: accentSoft,
+      onPrimaryContainer: ink,
+      surface: surface,
+      onSurface: ink,
+      error: danger,
     ),
-    dividerColor: HomeColors.border,
-    dividerTheme: base.dividerTheme.copyWith(color: HomeColors.border),
+    dividerColor: border,
+    dividerTheme: base.dividerTheme.copyWith(color: border),
     inputDecorationTheme: base.inputDecorationTheme.copyWith(
-      fillColor: HomeColors.surface,
-      border: const OutlineInputBorder(
+      fillColor: surface,
+      enabledBorder: OutlineInputBorder(
         borderRadius: HomeShape.smRadius,
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: border),
       ),
-      enabledBorder: const OutlineInputBorder(
+      focusedBorder: OutlineInputBorder(
         borderRadius: HomeShape.smRadius,
-        borderSide: BorderSide(color: HomeColors.border),
-      ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: HomeShape.smRadius,
-        borderSide: BorderSide(color: HomeColors.accent, width: 1.4),
+        borderSide: BorderSide(color: accent, width: 1.4),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: HomeColors.accent,
-        foregroundColor: HomeColors.accentOn,
+        backgroundColor: accent,
+        foregroundColor: accentOn,
         minimumSize: const Size(0, 44),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         shape: const RoundedRectangleBorder(borderRadius: HomeShape.mdRadius),
@@ -107,9 +121,9 @@ ThemeData elegantHomeTheme() {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: HomeColors.ink,
-        backgroundColor: HomeColors.surface,
-        side: const BorderSide(color: HomeColors.border),
+        foregroundColor: ink,
+        backgroundColor: surface,
+        side: BorderSide(color: border),
         minimumSize: const Size(0, 44),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         shape: const RoundedRectangleBorder(borderRadius: HomeShape.mdRadius),
@@ -117,20 +131,20 @@ ThemeData elegantHomeTheme() {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: HomeColors.accent,
+        foregroundColor: accent,
         shape: const RoundedRectangleBorder(borderRadius: HomeShape.mdRadius),
       ),
     ),
     iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(foregroundColor: HomeColors.ink),
+      style: IconButton.styleFrom(foregroundColor: ink),
     ),
     dialogTheme: base.dialogTheme.copyWith(
-      backgroundColor: HomeColors.surface,
+      backgroundColor: surface,
       shape: const RoundedRectangleBorder(borderRadius: HomeShape.lgRadius),
     ),
     snackBarTheme: base.snackBarTheme.copyWith(
-      backgroundColor: HomeColors.ink,
-      contentTextStyle: const TextStyle(color: HomeColors.accentOn),
+      backgroundColor: ink,
+      contentTextStyle: TextStyle(color: accentOn),
     ),
   );
 }

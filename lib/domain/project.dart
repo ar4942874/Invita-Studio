@@ -5,6 +5,7 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import '../services/invite_actions.dart' show isValidRsvpUrl;
 import '../services/photo_service.dart';
 import 'event_schedule.dart';
+import 'focus_light.dart';
 import 'invitation_template.dart';
 import 'video/timeline.dart';
 
@@ -28,6 +29,7 @@ class StudioProject {
     this.category = InvitationCategory.wedding,
     this.when,
     this.rsvpUrl,
+    this.focusLight = FocusLightSetting.none,
   });
   final String id, title;
   final DateTime updatedAt;
@@ -45,6 +47,10 @@ class StudioProject {
 
   /// Optional RSVP destination the host supplies, used to draw the RSVP code.
   final String? rsvpUrl;
+
+  /// The light thrown across the card. Additive to schema 2: absent means no
+  /// light, so every project written before this existed still opens as-is.
+  final FocusLightSetting focusLight;
 
   /// IDs of the layers that can be animated (the background is not a layer).
   Set<String> get layerIds => {
@@ -96,6 +102,7 @@ class StudioProject {
     bool clearWhen = false,
     String? rsvpUrl,
     bool clearRsvpUrl = false,
+    FocusLightSetting? focusLight,
   }) => StudioProject(
     id: id,
     title: title ?? this.title,
@@ -105,6 +112,7 @@ class StudioProject {
     category: category ?? this.category,
     when: clearWhen ? null : (when ?? this.when),
     rsvpUrl: clearRsvpUrl ? null : (rsvpUrl ?? this.rsvpUrl),
+    focusLight: focusLight ?? this.focusLight,
   );
 
   /// A copy under a new ID, for "Duplicate draft".
@@ -121,6 +129,7 @@ class StudioProject {
         category: category,
         when: when,
         rsvpUrl: rsvpUrl,
+        focusLight: focusLight,
       );
 
   Map<String, dynamic> toJson() => {
@@ -134,6 +143,7 @@ class StudioProject {
     'video': video.toJson(),
     if (when != null) 'when': when!.toJson(),
     if (rsvpUrl != null) 'rsvpUrl': rsvpUrl,
+    if (focusLight.light != FocusLight.none) 'focusLight': focusLight.toJson(),
   };
   String encode() => const JsonEncoder.withIndent('  ').convert(toJson());
 
@@ -324,6 +334,7 @@ class StudioProject {
             InvitationCategory.wedding,
         when: when,
         rsvpUrl: rsvp as String?,
+        focusLight: FocusLightSetting.decode(json['focusLight']),
       );
       final problems = project.effectiveVideo.validate(
         layerIds: project.layerIds,

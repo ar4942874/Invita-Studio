@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../domain/focus_light.dart';
 import '../../domain/video/timeline.dart';
 import 'export_media.dart';
 import 'frame_renderer.dart';
@@ -109,6 +110,7 @@ class VideoExportRequest {
     this.imageProvider,
     this.outputWidth = 1080,
     this.bitrate,
+    this.focusLight = FocusLightSetting.none,
   });
 
   final String projectId;
@@ -125,6 +127,9 @@ class VideoExportRequest {
   /// 1080 for a full-quality Story export, 540 for the lighter option.
   final int outputWidth;
   final int? bitrate;
+
+  /// The card's light, frozen with the rest of the request.
+  final FocusLightSetting focusLight;
 }
 
 /// Renders and encodes a video invitation.
@@ -262,6 +267,7 @@ class VideoExporter {
     final renderer = TimelineFrameRenderer(
       document: document,
       imageCache: images,
+      focusLight: request.focusLight,
     );
     final feed = request.clip == null
         ? null

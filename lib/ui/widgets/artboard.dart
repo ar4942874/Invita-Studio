@@ -5,9 +5,13 @@ import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 import '../../application/studio_controller.dart';
 import '../../domain/invitation_template.dart';
+import '../focus_light_sheet.dart';
+import '../guide/guide_scope.dart';
+import '../guide/guide_stop.dart';
 import '../studio_theme.dart';
 import 'controls.dart';
 import 'document_preview.dart';
+import 'focus_light_layer.dart';
 
 class ArtboardWorkspace extends StatefulWidget {
   const ArtboardWorkspace({
@@ -169,11 +173,13 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
             children: [
               IconButton(
                 tooltip: 'Undo (Ctrl / Cmd Z)',
+                visualDensity: widget.compact ? VisualDensity.compact : null,
                 onPressed: studio.canUndo ? studio.undo : null,
                 icon: const Icon(Icons.undo, size: 18),
               ),
               IconButton(
                 tooltip: 'Redo (Ctrl / Cmd Shift Z)',
+                visualDensity: widget.compact ? VisualDensity.compact : null,
                 onPressed: studio.canRedo ? studio.redo : null,
                 icon: const Icon(Icons.redo, size: 18),
               ),
@@ -181,7 +187,9 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                 width: 1,
                 height: 20,
                 color: StudioColors.border,
-                margin: const EdgeInsets.symmetric(horizontal: 10),
+                margin: EdgeInsets.symmetric(
+                  horizontal: widget.compact ? 4 : 10,
+                ),
               ),
               const Icon(
                 Icons.crop_portrait_outlined,
@@ -189,8 +197,11 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                 color: StudioColors.muted,
               ),
               const SizedBox(width: 7),
-              DropdownButtonHideUnderline(
-                child: DropdownButton<InvitationFormat>(
+              GuideTarget(
+                anchor: GuideAnchors.format,
+                radius: 8,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<InvitationFormat>(
                   value: studio.format,
                   isDense: true,
                   style: const TextStyle(
@@ -210,18 +221,26 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                         ),
                       )
                       .toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      FocusScope.of(context).unfocus();
-                      studio.chooseFormat(v);
-                      _setZoom(1);
-                    }
-                  },
+                    onChanged: (v) {
+                      if (v != null) {
+                        FocusScope.of(context).unfocus();
+                        studio.chooseFormat(v);
+                        _setZoom(1);
+                      }
+                    },
+                  ),
                 ),
+              ),
+              SizedBox(width: widget.compact ? 0 : 4),
+              GuideTarget(
+                anchor: GuideAnchors.lights,
+                radius: 8,
+                child: _lightsButton(),
               ),
               const Spacer(),
               IconButton(
                 tooltip: 'Preview invitation',
+                visualDensity: widget.compact ? VisualDensity.compact : null,
                 onPressed: _preview,
                 icon: const Icon(Icons.visibility_outlined, size: 19),
               ),
@@ -320,16 +339,27 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
                             ),
                             child: RepaintBoundary(
                               child: MediaQuery.withNoTextScaling(
-                                child: CanvasEditorWidget(
-                                  controller: studio.editor,
-                                  viewportPadding: 0,
-                                  theme: const CanvasTheme(
-                                    selectionBorderColor: StudioColors.accent,
-                                    handleColor: StudioColors.accent,
-                                    rotationHandleColor: StudioColors.accent,
-                                    selectionBorderWidth: 1.2,
-                                    handleSize: 7,
-                                  ),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    CanvasEditorWidget(
+                                      controller: studio.editor,
+                                      viewportPadding: 0,
+                                      theme: const CanvasTheme(
+                                        selectionBorderColor:
+                                            StudioColors.accent,
+                                        handleColor: StudioColors.accent,
+                                        rotationHandleColor:
+                                            StudioColors.accent,
+                                        selectionBorderWidth: 1.2,
+                                        handleSize: 7,
+                                      ),
+                                    ),
+                                    if (!studio.project.focusLight.isOff)
+                                      FocusLightLayer(
+                                        setting: studio.project.focusLight,
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -426,6 +456,46 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _lightsButton() {
+    final setting = widget.studio.project.focusLight;
+    final lit = !setting.isOff;
+    final label = lit ? setting.light.label : 'Lights';
+    final icon = Icon(
+      lit ? Icons.light_mode : Icons.light_mode_outlined,
+      size: 17,
+      color: lit ? StudioColors.accent : StudioColors.ink,
+    );
+    if (widget.compact) {
+      // The 320 px toolbar has no room for a default 48 px target here; 32 px
+      // still clears the 44 px recommendation once its padding is counted and
+      // keeps the row from overflowing on the narrowest phone.
+      return IconButton(
+        tooltip: 'Focus lights · $label',
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        onPressed: () => FocusLightSheet.show(context, widget.studio),
+        icon: icon,
+      );
+    }
+    return TextButton.icon(
+      onPressed: () => FocusLightSheet.show(context, widget.studio),
+      icon: icon,
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: lit ? FontWeight.w600 : FontWeight.w500,
+          color: lit ? StudioColors.accent : StudioColors.ink,
+        ),
+      ),
+      style: TextButton.styleFrom(
+        minimumSize: const Size(0, 34),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+      ),
     );
   }
 }
