@@ -46,6 +46,21 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+## Design-system references (OpenDesign)
+
+The colour and shape tokens are adapted from two packages of the **OpenDesign**
+design-system collection (Apache-2.0), read as reference material only:
+
+- `premium` — the neutral studio palette (`lib/ui/studio_theme.dart`).
+- `elegant` — the landing wizard's shape and density (`lib/ui/home_theme.dart`).
+
+The per-celebration palettes in `lib/ui/occasion_theme.dart` are this project's
+own, derived from the same token structure; no OpenDesign package is vendored,
+compiled or redistributed, and no package code is copied into the app. The
+Apache-2.0 license of the referenced packages applies to those packages, not to
+this project's source. No brand-specific package (for example a corporate
+identity system) is used as a source.
+
 ## Video pipeline
 
 The video feature adds **no new package dependency** and links no third-party
