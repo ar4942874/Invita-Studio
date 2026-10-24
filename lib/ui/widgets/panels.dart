@@ -699,6 +699,31 @@ class _DesignTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // The tile shows the artwork, which is shared by every
+                  // composition; the tag names the arrangement it will draw.
+                  Positioned(
+                    left: 4,
+                    bottom: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .82),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        template.layout.label,
+                        style: const TextStyle(
+                          fontSize: 7.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: .2,
+                          color: StudioColors.ink,
+                        ),
+                      ),
+                    ),
+                  ),
                   Positioned(
                     top: 2,
                     right: 2,

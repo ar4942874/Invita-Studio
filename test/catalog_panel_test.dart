@@ -177,6 +177,28 @@ void main() {
     expect(decode.width, greaterThanOrEqualTo(160));
   });
 
+  testWidgets('each tile names the composition it will draw', (tester) async {
+    final studio = await _studio();
+    addTearDown(studio.dispose);
+    await _pump(tester, TemplatesPanel(studio: studio), studio: studio);
+
+    final tile = find.byKey(const ValueKey('design_botanical_wedding'));
+    expect(
+      find.descendant(of: tile, matching: find.text('Centred')),
+      findsOneWidget,
+    );
+    // The category's designs are not all one arrangement.
+    expect(
+      templatesFor(InvitationCategory.wedding)
+          .map((design) => design.layout)
+          .toSet()
+          .length,
+      greaterThan(1),
+    );
+    expect(tester.takeException(), isNull);
+    await studio.saveNow();
+  });
+
   testWidgets('starring a design puts it in favourites', (tester) async {
     final studio = await _studio();
     addTearDown(studio.dispose);
