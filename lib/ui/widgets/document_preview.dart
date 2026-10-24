@@ -12,7 +12,7 @@ BoxFit boxFitFromName(String fit) => switch (fit) {
   _ => BoxFit.cover,
 };
 
-Widget _photoImage(ImageNode node) {
+Widget _photoImage(ImageNode node, int decodeWidth) {
   final bytes = photoBytesCached(node.assetId);
   if (bytes == null) {
     return const ColoredBox(
@@ -23,14 +23,28 @@ Widget _photoImage(ImageNode node) {
   return Image.memory(
     bytes,
     fit: boxFitFromName(node.fit),
+    cacheWidth: decodeWidth,
     gaplessPlayback: true,
   );
 }
 
 /// Lightweight, noninteractive thumbnail of the actual editable document.
 class DocumentPreview extends StatelessWidget {
-  const DocumentPreview({super.key, required this.document});
+  const DocumentPreview({
+    super.key,
+    required this.document,
+    this.decodeWidth = 420,
+  });
+
   final DesignDocument document;
+
+  /// Physical pixels each bitmap is decoded at.
+  ///
+  /// The artwork is a 2160 × 3024 asset, so decoding it as-is costs ~26 MB per
+  /// preview. The home card step shows ten previews at once and the panels show
+  /// them at 34–70 px, so every caller here wants a few hundred pixels, not
+  /// the full artwork. Raise it for a large, inspectable preview.
+  final int decodeWidth;
   @override
   Widget build(BuildContext context) {
     final sorted = [...document.nodes]
@@ -49,7 +63,11 @@ class DocumentPreview extends StatelessWidget {
                 for (final node in sorted)
                   if (node is BackgroundNode)
                     Positioned.fill(
-                      child: Image.asset(node.assetId!, fit: BoxFit.fill),
+                      child: Image.asset(
+                        node.assetId!,
+                        fit: BoxFit.fill,
+                        cacheWidth: decodeWidth,
+                      ),
                     )
                   else if (node is TextNode)
                     Positioned.fromRect(
@@ -99,7 +117,7 @@ class DocumentPreview extends StatelessWidget {
                             ),
                           ),
                         child: ClipRect(
-                          child: _photoImage(node),
+                          child: _photoImage(node, decodeWidth),
                         ),
                       ),
                     ),

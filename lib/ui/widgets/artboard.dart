@@ -76,7 +76,11 @@ class _ArtboardWorkspaceState extends State<ArtboardWorkspace> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(28),
-                child: DocumentPreview(document: widget.studio.document),
+                child: DocumentPreview(
+                  document: widget.studio.document,
+                  // This one is inspectable at full size.
+                  decodeWidth: 1080,
+                ),
               ),
             ),
           ],

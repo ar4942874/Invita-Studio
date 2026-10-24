@@ -48,7 +48,7 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 | Dependency resolution with `pubspec.lock` | Passed |
 | `flutter analyze` | **No issues found** |
 | `flutter test --concurrency=1 test packages/flutter_canvas_editor/test` | **64 passed** (image-editor baseline) |
-| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 20 test files pass** |
+| Full suite (`flutter test test packages/flutter_canvas_editor/test`) | **All 22 test files pass** |
 | `flutter build web --release --no-web-resources-cdn --no-wasm-dry-run -O1` | **Built successfully** |
 | Real compiled-app browser workflow checks | **12 passed** |
 | Real compiled-app photo-card browser checks | **7 passed** |
@@ -80,6 +80,8 @@ renderer that reproduces the app's bundled artwork, fonts, layout constants and
 - Duplicate draft: forks a new ID (document ID follows), keeps the copy title inside 80 characters, opens the copy, leaves the original intact and refuses a 13th draft.
 - Structured event: `EventDateTime` encode/decode/validation, `.ics` structure and CRLF/octet folding (including Urdu text), Google Calendar links, RSVP URL validation and relative "edited 2 h ago" labels.
 - Catalogue: the picker opens on the project category, "All designs" reaches sixty, starring moves a design into favourites, "Surprise me" always changes the card, and recently-used reflects the last applied design.
+- Compositions: all three arrangements produce the same ten linked layers in order, inside the page, with no layer painting over the one below it, across all three formats and with deliberately long names; the centred arrangement still matches the shipped geometry; every design carries its own composition; and the studio detects the applied composition, keeps it through a format change and a reopen, restores it on undo, and reports "unknown" rather than guessing after the layers are moved.
+- Catalogue scale: only the visible rows are built, page two is absent from the tree until "Show more" is pressed, the remaining count is exact, and design thumbnails decode at tile width instead of source size. Previews decode at thumbnail size by default, keep their layout at any decode width, and every bundled background resolves back to its own design.
 - The details panel shows the structured calendar line once a date is picked, and the event sheet applies a category change from the UI.
 - Responsive widget layouts at **320, 390, 850, 1024 and 1440 pixels**, including mobile sheets/export setup.
 - Actual canvas drag/inline-edit gestures and undo, not only controller method calls.

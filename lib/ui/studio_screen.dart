@@ -416,7 +416,10 @@ class _StudioScreenState extends State<StudioScreen>
                               width: 42,
                               height: 59,
                               child: ExcludeSemantics(
-                                child: DocumentPreview(document: draft.document),
+                                child: DocumentPreview(
+                                  document: draft.document,
+                                  decodeWidth: 180,
+                                ),
                               ),
                             ),
                             title: Text(
